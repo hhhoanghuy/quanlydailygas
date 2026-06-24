@@ -31,6 +31,12 @@ const ORDER_STATUS = {
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("vi-VN")} kg`;
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+function roleBadge(role) {
+  if (role === "owner") return '<span class="badge badge-owner">Chủ đại lý</span>';
+  if (role === "employee") return '<span class="badge badge-employee">Nhân viên</span>';
+  return '<span class="badge badge-pending">Chưa kích hoạt</span>';
+}
+
 function statusBadge(status) {
   const cls = status === "completed" ? "badge-ok" : status === "cancelled" ? "badge-danger" : "badge-warn";
   return `<span class="badge ${cls}">${ORDER_STATUS[status] || status}</span>`;
@@ -644,26 +650,66 @@ const pages = {
   },
 
   async employees(el) {
-    setPageSub("Quản lý nhân viên giao hàng");
+    setPageSub("Chủ đại lý và nhân viên giao hàng — phân vai trò rõ ràng");
     setPageActions(`<button class="btn btn-primary" id="em-invite">+ Tạo mã mời NV</button>`);
     el.innerHTML = `<div id="em-body"><p class="empty">Đang tải…</p></div>`;
 
     const load = async () => {
-      const { data } = await api("/employees");
-      const rows = data.map((e) => `<tr>
+      const { team, owner } = await api("/employees");
+      const members = team || [];
+
+      const ownerRow = owner
+        ? `<tr class="row-owner">
+        <td>${roleBadge("owner")}</td>
+        <td><strong>${owner.name}</strong></td><td>${owner.phone}</td>
+        <td>${owner.telegramUsername ? "@" + owner.telegramUsername : '<span class="badge badge-ok">Telegram OK</span>'}</td>
+        <td>${owner.deliveriesThisMonth}</td>
+        <td><span class="badge badge-ok">Hoạt động</span></td>
+        <td class="muted">—</td>
+      </tr>`
+        : "";
+
+      const nvRows = members
+        .filter((m) => !m.isOwner)
+        .map((e) => {
+          const tg = e.hasTelegram
+            ? e.telegramUsername
+              ? "@" + e.telegramUsername
+              : '<span class="badge badge-ok">Telegram OK</span>'
+            : '<span class="badge badge-pending">Chưa kích hoạt</span>';
+          const actions = e.isOwner
+            ? '<span class="muted">—</span>'
+            : `<button class="btn btn-sm" data-toggle="${e.id}" data-active="${e.active}">${e.active ? "Ngưng" : "Bật lại"}</button>`;
+          return `<tr>
+        <td>${roleBadge(e.role)}</td>
         <td><strong>${e.name}</strong></td><td>${e.phone}</td>
-        <td>${e.hasTelegram ? '<span class="badge badge-ok">Đã kích hoạt</span>' : '<span class="badge badge-warn">Chưa Telegram</span>'}</td>
+        <td>${tg}</td>
         <td>${e.deliveriesThisMonth}</td>
         <td>${e.active ? '<span class="badge badge-ok">Hoạt động</span>' : '<span class="badge badge-off">Ngưng</span>'}</td>
-        <td><button class="btn btn-sm" data-toggle="${e.id}" data-active="${e.active}">${e.active ? "Ngưng" : "Bật lại"}</button></td>
-      </tr>`);
+        <td>${actions}</td>
+      </tr>`;
+        });
+
+      const nvOnly = members.filter((m) => !m.isOwner);
       el.querySelector("#em-body").innerHTML = `
         <div class="stat-grid" style="margin-bottom:1.25rem">
-          ${statCard("blue", "users", "Tổng NV", data.length)}
-          ${statCard("green", "users", "Đã kích hoạt", data.filter((e) => e.hasTelegram).length)}
-          ${statCard("amber", "truck", "Giao tháng này", data.reduce((s, e) => s + e.deliveriesThisMonth, 0))}
+          ${statCard("blue", "users", "Chủ đại lý", owner ? 1 : 0)}
+          ${statCard("green", "users", "NV đã kích hoạt", nvOnly.filter((e) => e.role === "employee").length)}
+          ${statCard("amber", "users", "NV chờ kích hoạt", nvOnly.filter((e) => e.role === "pending").length)}
         </div>
-        ${panel("Danh sách nhân viên", "", table(["Tên", "SĐT", "Telegram", "Đơn/tháng", "Trạng thái", ""], rows))}`;
+        ${panel(
+          "Đội ngũ",
+          "",
+          table(
+            ["Vai trò", "Tên", "SĐT", "Telegram", "Đơn/tháng", "Trạng thái", ""],
+            ownerRow ? [ownerRow, ...nvRows] : nvRows,
+          ),
+        )}
+        <p class="muted" style="margin-top:.75rem;font-size:.8rem">
+          <strong>Chủ đại lý</strong> (owner): quản lý toàn bộ, mở web dashboard.<br />
+          <strong>Nhân viên</strong> (employee): giao hàng qua bot Telegram.<br />
+          <strong>Chưa kích hoạt</strong>: đã tạo hồ sơ NV nhưng chưa /start mã mời.
+        </p>`;
       el.querySelectorAll("[data-toggle]").forEach((btn) => btn.onclick = async () => {
         await api(`/employees/${btn.dataset.toggle}/active`, {
           method: "PATCH", body: JSON.stringify({ active: btn.dataset.active !== "true" }),
@@ -787,7 +833,7 @@ const PAGE_TITLES = {
   overview: "Tổng quan",
   revenue: "Doanh thu / Công nợ",
   customers: "Khách hàng",
-  employees: "Nhân viên",
+  employees: "Đội ngũ",
   cylinders: "Quản lý vỏ",
   orders: "Đơn hàng",
   "gas-surplus": "Gas dư trả NM",
@@ -822,7 +868,10 @@ function renderApp(user) {
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("app-screen").classList.remove("hidden");
   document.getElementById("user-name").textContent = user.name;
-  document.getElementById("user-role").textContent = user.role === "owner" ? "CHỦ ĐẠI LÝ" : "NHÂN VIÊN";
+  const roleEl = document.getElementById("user-role");
+  const isOwner = user.role === "owner";
+  roleEl.textContent = isOwner ? "Chủ đại lý" : "Nhân viên";
+  roleEl.className = "user-role " + (isOwner ? "role-owner" : "role-employee");
   const initial = (AGENCY || "G").charAt(0).toUpperCase();
   document.getElementById("brand-initial").textContent = initial;
   const loginLogo = document.querySelector(".login-logo");

@@ -32,7 +32,7 @@ import {
   getCurrentPrices,
   listCylinderTypes,
 } from "../services/price-period.service.js";
-import { listEmployees, setEmployeeActive } from "../services/employee.service.js";
+import { listEmployees, listTeamMembers, setEmployeeActive } from "../services/employee.service.js";
 import { getGasSurplusDashboard } from "../services/gas-surplus.service.js";
 import { getOrderDetailForWeb, listOrders, previewOrderCorrection, correctCompletedOrder } from "../services/order.service.js";
 import type { OrderCorrectionInput } from "../services/order.service.js";
@@ -248,7 +248,12 @@ export async function registerApiRoutes(app: FastifyInstance) {
 
         secured.get("/employees", async (req) => {
         assertOwner(req.user!);
-        return { data: await listEmployees(api.db) };
+        const team = await listTeamMembers(api.db);
+        return {
+          data: team.filter((m) => !m.isOwner),
+          team,
+          owner: team.find((m) => m.isOwner) ?? null,
+        };
       });
 
         secured.patch("/employees/:id/active", async (req) => {
