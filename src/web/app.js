@@ -73,14 +73,58 @@ function renderCorrectionPreview(container, preview) {
   const d = preview.delta;
   container.classList.remove("hidden");
   container.innerHTML = `
-    <h4 style="margin:0 0 .5rem;font-size:.9rem">Chênh lệch sau sửa</h4>
-    <div class="detail-grid">
-      <div class="detail-item"><div class="lbl">Tổng đơn</div><div class="val money">${fmt(preview.before.orderAmount)} → ${fmt(preview.after.orderAmount)} (${fmtDelta(d.orderAmount)})</div></div>
-      <div class="detail-item"><div class="lbl">Thu tiền</div><div class="val money">${fmt(preview.before.cashReceived)} → ${fmt(preview.after.cashReceived)} (${fmtDelta(d.cashReceived)})</div></div>
-      <div class="detail-item"><div class="lbl">Nợ thêm lần này</div><div class="val money">${fmt(preview.before.debtAmount)} → ${fmt(preview.after.debtAmount)} (${fmtDelta(d.debtAmount)})</div></div>
-      <div class="detail-item"><div class="lbl">Vỏ giữ (lần giao)</div><div class="val">${preview.before.holding} → ${preview.after.holding} bình (${fmtDelta(d.holding, " bình")})</div></div>
+    <h4 class="correction-preview-title">Chênh lệch sau sửa</h4>
+    <div class="correction-preview-grid">
+      <div class="correction-preview-item">
+        <span class="lbl">Tổng đơn</span>
+        <span class="val money">${fmt(preview.before.orderAmount)} → ${fmt(preview.after.orderAmount)}</span>
+        <span class="delta">${fmtDelta(d.orderAmount)}</span>
+      </div>
+      <div class="correction-preview-item">
+        <span class="lbl">Thu tiền</span>
+        <span class="val money">${fmt(preview.before.cashReceived)} → ${fmt(preview.after.cashReceived)}</span>
+        <span class="delta">${fmtDelta(d.cashReceived)}</span>
+      </div>
+      <div class="correction-preview-item">
+        <span class="lbl">Nợ thêm lần này</span>
+        <span class="val money">${fmt(preview.before.debtAmount)} → ${fmt(preview.after.debtAmount)}</span>
+        <span class="delta">${fmtDelta(d.debtAmount)}</span>
+      </div>
+      <div class="correction-preview-item">
+        <span class="lbl">Vỏ giữ (lần giao)</span>
+        <span class="val">${preview.before.holding} → ${preview.after.holding} bình</span>
+        <span class="delta">${fmtDelta(d.holding, " bình")}</span>
+      </div>
     </div>
-    <p class="muted" style="margin:.5rem 0 0">Giá giữ nguyên lúc giao · Ngày giờ giao không đổi</p>`;
+    <p class="muted correction-preview-foot">Giá giữ nguyên lúc giao · Ngày giờ giao không đổi</p>`;
+}
+
+function renderCorrectionLines(lines) {
+  return `<div class="correction-lines">${lines
+    .map(
+      (l, i) => `
+    <div class="correction-line-card" data-line-idx="${i}">
+      <div class="correction-line-head">
+        <strong>${esc(l.typeName)}</strong>
+        <span class="money muted">Giá cũ: ${fmt(l.lineAmount)}</span>
+      </div>
+      <div class="correction-line-fields">
+        <div class="field correction-field">
+          <label>Giao</label>
+          <input name="out" type="number" min="0" value="${l.cylindersOut}" inputmode="numeric" />
+        </div>
+        <div class="field correction-field">
+          <label>Thu vỏ</label>
+          <input name="in" type="number" min="0" value="${l.cylindersIn}" inputmode="numeric" />
+        </div>
+        <div class="field correction-field">
+          <label>Gas dư (kg)</label>
+          <input name="gas" type="number" min="0" step="0.1" value="${l.gasSurplusKg || 0}" inputmode="decimal" />
+        </div>
+      </div>
+    </div>`,
+    )
+    .join("")}</div>`;
 }
 
 async function openOrderEditModal(orderId, detail) {
@@ -97,24 +141,17 @@ async function openOrderEditModal(orderId, detail) {
     .join("");
 
   const pay = f.paymentMethod || (f.cashReceived > 0 ? "tm" : "no");
-  const lineRows = f.lines.map((l, i) => `
-    <tr data-line-idx="${i}">
-      <td>${esc(l.typeName)}</td>
-      <td><input name="out" type="number" min="0" value="${l.cylindersOut}" style="width:4rem" /></td>
-      <td><input name="in" type="number" min="0" value="${l.cylindersIn}" style="width:4rem" /></td>
-      <td><input name="gas" type="number" min="0" step="0.1" value="${l.gasSurplusKg || 0}" style="width:4.5rem" /></td>
-      <td class="money">${fmt(l.lineAmount)}</td>
-    </tr>`).join("");
 
   const body = `
-    <p class="muted">Chỉ sửa số trên dòng có sẵn · Trong vòng 48h sau giao · Không đổi khách / ngày giờ / giá</p>
+    <p class="correction-hint muted">Chỉ sửa số trên dòng có sẵn · Trong 48h · Không đổi khách / ngày / giá</p>
     <div class="field"><label>NV giao</label><select name="employee_id">${empOptions}</select></div>
-    <div class="field"><label>Dòng bình</label>
-      <table><thead><tr><th>Loại</th><th>Giao</th><th>Thu vỏ</th><th>Gas dư</th><th>Tiền (cũ)</th></tr></thead><tbody>${lineRows}</tbody></table>
+    <div class="field">
+      <label>Dòng bình (${f.lines.length})</label>
+      ${renderCorrectionLines(f.lines)}
     </div>
-    <div class="field-row" style="display:flex;gap:.75rem;flex-wrap:wrap">
-      <div class="field" style="flex:1;min-width:140px"><label>Thu tiền (đ)</label><input name="cash_received" type="number" min="0" step="1000" value="${f.cashReceived}" /></div>
-      <div class="field" style="flex:1;min-width:140px"><label>Thanh toán</label>
+    <div class="field-row">
+      <div class="field"><label>Thu tiền (đ)</label><input name="cash_received" type="number" min="0" step="1000" value="${f.cashReceived}" inputmode="numeric" /></div>
+      <div class="field"><label>Thanh toán</label>
         <select name="payment_method">
           <option value="tm" ${pay === "tm" ? "selected" : ""}>Tiền mặt</option>
           <option value="ck" ${pay === "ck" ? "selected" : ""}>Chuyển khoản</option>
@@ -123,10 +160,11 @@ async function openOrderEditModal(orderId, detail) {
       </div>
     </div>
     <div class="field"><label>Ghi chú thêm (tuỳ chọn)</label><input name="note" type="text" placeholder="Ghi chú ngoài payment=..." /></div>
-    <button type="button" class="btn" id="preview-correction">Xem trước chênh lệch</button>
-    <div id="correction-preview" class="hidden"></div>`;
+    <button type="button" class="btn btn-block" id="preview-correction">Xem trước chênh lệch</button>
+    <div id="correction-preview" class="correction-preview hidden"></div>`;
 
   const modal = showModal("Sửa đơn đã giao", body, null, null, true);
+  modal.querySelector(".modal")?.classList.add("modal-correction");
   const previewBox = modal.querySelector("#correction-preview");
   let lastPreview = null;
 
