@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{AGENCY_NAME}} — Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/app.css" />
+</head>
+<body data-agency="{{AGENCY_NAME}}">
+
+  <div id="login-screen" class="login-wrap hidden">
+    <div class="login-box">
+      <div class="login-logo">G</div>
+      <h1>{{AGENCY_NAME}}</h1>
+      <p>Mở link từ Telegram bot — lệnh <strong>/dashboard</strong></p>
+      <p class="muted">Link chỉ dùng <strong>một lần</strong>, hết hạn sau 5 phút.<br />Sau khi vào, phiên làm việc giữ <strong>8 giờ</strong> — link hết hạn không ảnh hưởng phiên đang mở.</p>
+      <p id="login-err" class="error"></p>
+    </div>
+  </div>
+
+  <div id="app-screen" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-logo" id="brand-initial">G</div>
+        <div class="brand-name" id="brand-name">{{AGENCY_NAME}}</div>
+      </div>
+      <div class="user-block">
+        <div class="user-name" id="user-name"></div>
+        <div class="user-role" id="user-role">CHỦ ĐẠI LÝ</div>
+      </div>
+      <nav class="nav">
+        <a href="#" data-page="overview" class="active">
+          <span class="nav-icon" data-icon="overview"></span>
+          <span>Tổng quan</span>
+        </a>
+        <a href="#" data-page="revenue">
+          <span class="nav-icon" data-icon="revenue"></span>
+          <span>Doanh thu / Công nợ</span>
+        </a>
+        <a href="#" data-page="customers">
+          <span class="nav-icon" data-icon="customers"></span>
+          <span>Khách hàng</span>
+        </a>
+        <a href="#" data-page="employees">
+          <span class="nav-icon" data-icon="employees"></span>
+          <span>Nhân viên</span>
+        </a>
+        <a href="#" data-page="cylinders">
+          <span class="nav-icon" data-icon="cylinders"></span>
+          <span>Quản lý vỏ</span>
+        </a>
+        <a href="#" data-page="orders">
+          <span class="nav-icon" data-icon="orders"></span>
+          <span>Đơn hàng</span>
+        </a>
+        <a href="#" data-page="gas-surplus">
+          <span class="nav-icon" data-icon="gas"></span>
+          <span>Gas dư trả NM</span>
+        </a>
+      </nav>
+      <button class="logout-btn" id="btn-logout">
+        <span class="nav-icon" data-icon="logout"></span>
+        <span>Đăng xuất</span>
+      </button>
+    </aside>
+
+    <div class="main">
+      <header class="page-header">
+        <div>
+          <h1 id="page-title">Tổng quan</h1>
+          <p class="page-sub" id="page-sub"></p>
+        </div>
+        <div id="page-actions" class="page-actions"></div>
+      </header>
+      <div class="content" id="page-content"></div>
+    </div>
+  </div>
+
+  <script src="/dashboard/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+---
+description: Startup MVP OS — ưu tiên ra mắt nhanh, YAGNI, monolith, phase protection
+alwaysApply: true
+---
+
+# STARTUP MVP OS
+
+Mục tiêu:
+
+Build MVP có thể bán được trong thời gian ngắn.
+
+---
+
+# MVP FIRST
+
+Luôn ưu tiên:
+
+Bán được > Hoàn hảo
+
+Có người dùng > Kiến trúc đẹp
+
+Đơn giản > Phức tạp
+
+---
+
+# MVP FILTER
+
+Trước khi build tính năng mới phải trả lời:
+
+1. Ai dùng?
+
+2. Nỗi đau nào được giải quyết?
+
+3. Có giúp bán hàng không?
+
+4. Có giúp vận hành không?
+
+5. Làm dưới 3 ngày được không?
+
+Nếu không:
+
+Đưa vào backlog.
+
+Không build.
+
+---
+
+# YAGNI
+
+Không xây thứ chưa cần.
+
+Không xây:
+
+* Permission phức tạp
+* Workflow engine
+* Microservice
+* Event Bus
+* Kafka
+* CQRS
+
+trong MVP.
+
+---
+
+# SMALL TEAM RULE
+
+Giả định:
+
+* 1 đến 5 dev
+* ngân sách thấp
+* cần ra mắt nhanh
+
+Ưu tiên:
+
+* PostgreSQL
+* Monolith
+* Docker đơn giản
+
+---
+
+# FEATURE FLOW
+
+Mỗi feature phải có:
+
+docs/features/feature-name.md
+
+bao gồm:
+
+* Mục tiêu
+* User
+* Flow
+* Business Rules
+* Database
+* API
+* Edge Cases
+* KPI
+
+---
+
+# PHASE RULE
+
+Mỗi phase phải có:
+
+docs/phases/phase-x.md
+
+---
+
+# PHASE PROTECTION
+
+Phase mới:
+
+Không được phá phase cũ.
+
+Không được:
+
+* đổi API cũ
+* đổi database cũ
+* đổi hành vi cũ
+
+Phase mới chỉ được mở rộng.
+
+---
+
+# RELEASE RULE
+
+Mỗi release phải có:
+
+CHANGELOG.md
+
+bao gồm:
+
+* Added
+* Changed
+* Fixed
+
+---
+
+# CURSOR EXECUTION RULE
+
+Trước mọi tác vụ:
+
+1. Đọc docs
+2. Đọc phase hiện tại
+3. Đọc feature liên quan
+4. Phân tích
+5. Chờ phê duyệt
+
+Sau đó mới được code.
+
+---
+
+# MVP UI
+
+Ưu tiên:
+
+* Mobile First
+* Ít thao tác
+* Dùng được trên điện thoại
+
+Không thiết kế vì đẹp.
+
+Thiết kế vì thao tác nhanh.
+
+---
+
+# SUCCESS METRIC
+
+Mỗi feature phải có KPI đo lường.
+
+Nếu không đo được:
+
+Không build.

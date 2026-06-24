@@ -1,0 +1,255 @@
+---
+description: GasOS — giai đoạn phân tích, chỉ tạo tài liệu, cấm code cho đến khi "TÔI PHÊ DUYỆT"
+alwaysApply: true
+---
+
+# PROJECT INITIALIZATION MODE
+
+Đọc toàn bộ:
+
+.cursor/rules/01-engineering-os.mdc
+
+.cursor/rules/02-startup-mvp-os.mdc
+
+.cursor/rules/projects/gasos.mdc
+
+trước khi thực hiện bất kỳ hành động nào.
+
+---
+
+# QUY TẮC QUAN TRỌNG NHẤT
+
+DỰ ÁN ĐANG Ở GIAI ĐOẠN PHÂN TÍCH.
+
+TUYỆT ĐỐI KHÔNG ĐƯỢC:
+
+* Viết code
+* Tạo source code
+* Tạo component
+* Tạo API
+* Tạo migration
+* Tạo database schema
+* Tạo telegram bot
+
+cho tới khi có phê duyệt chính thức.
+
+---
+
+# MỤC TIÊU HIỆN TẠI
+
+Mục tiêu hiện tại KHÔNG PHẢI là xây dựng dự án.
+
+Mục tiêu hiện tại là:
+
+Phân tích đầy đủ nghiệp vụ.
+
+Xây dựng toàn bộ tài liệu dự án.
+
+Làm rõ tất cả yêu cầu.
+
+Tìm ra tất cả điểm chưa rõ.
+
+Đặt câu hỏi phản biện.
+
+Đề xuất giải pháp.
+
+Chờ phê duyệt.
+
+---
+
+# QUY TRÌNH BẮT BUỘC
+
+Bước 1
+
+Phân tích yêu cầu hiện tại.
+
+---
+
+Bước 2
+
+Liệt kê các thông tin còn thiếu.
+
+---
+
+Bước 3
+
+Đặt câu hỏi làm rõ.
+
+---
+
+Bước 4
+
+Đề xuất tài liệu cần tạo.
+
+---
+
+Bước 5
+
+Sinh tài liệu.
+
+---
+
+Bước 6
+
+Chờ người dùng chỉnh sửa.
+
+---
+
+Bước 7
+
+Cập nhật tài liệu.
+
+---
+
+Bước 8
+
+Chờ phê duyệt.
+
+---
+
+Bước 9
+
+Khi người dùng xác nhận:
+
+"TÔI PHÊ DUYỆT"
+
+mới được chuyển sang giai đoạn xây dựng.
+
+---
+
+# TÀI LIỆU BẮT BUỘC
+
+Phải tạo đầy đủ:
+
+docs/00-project-overview.md
+
+docs/01-product-vision.md
+
+docs/02-problem-analysis.md
+
+docs/03-target-customer.md
+
+docs/04-business-rules.md
+
+docs/05-user-flow.md
+
+docs/06-use-cases.md
+
+docs/07-database-design.md
+
+docs/08-api-design.md
+
+docs/09-ui-wireframe.md
+
+docs/10-phase-roadmap.md
+
+docs/11-non-functional-requirements.md
+
+docs/12-risk-analysis.md
+
+docs/13-test-strategy.md
+
+docs/14-definition-of-done.md
+
+---
+
+# YÊU CẦU KHI TẠO TÀI LIỆU
+
+Mỗi tài liệu phải:
+
+1. Có mục tiêu rõ ràng
+2. Có phạm vi rõ ràng
+3. Có ví dụ thực tế
+4. Có edge cases
+5. Có câu hỏi mở
+6. Có phần cần xác nhận
+
+---
+
+# BUSINESS RULE REVIEW MODE
+
+Khi viết nghiệp vụ:
+
+Không được giả định.
+
+Không được tự suy diễn.
+
+Nếu nghiệp vụ chưa rõ:
+
+Phải ghi:
+
+"CẦN CHỦ DỰ ÁN XÁC NHẬN"
+
+---
+
+# DATABASE REVIEW MODE
+
+Không được thiết kế database ngay.
+
+Phải:
+
+1. Hoàn thành Business Rules
+2. Hoàn thành User Flow
+3. Được phê duyệt
+
+sau đó mới được đề xuất Database Design.
+
+---
+
+# API REVIEW MODE
+
+Không được thiết kế API ngay.
+
+Chỉ được làm sau khi:
+
+Business Rules được duyệt.
+
+Database được duyệt.
+
+---
+
+# TELEGRAM REVIEW MODE
+
+Không được xây Telegram Flow ngay.
+
+Phải làm rõ:
+
+* Ai sử dụng?
+* Sử dụng bao nhiêu lần/ngày?
+* Mỗi thao tác mất bao lâu?
+* Có phù hợp Telegram không?
+
+Nếu chưa rõ:
+
+Phải đặt câu hỏi.
+
+---
+
+# OUTPUT FORMAT
+
+Luôn trả về:
+
+1. Phân tích
+2. Những điểm đã rõ
+3. Những điểm chưa rõ
+4. Câu hỏi cần xác nhận
+5. Tài liệu cần tạo tiếp theo
+6. Chờ phản hồi
+
+---
+
+# ĐIỀU KIỆN ĐƯỢC PHÉP CODE
+
+Chỉ được phép code khi:
+
+✓ Toàn bộ tài liệu hoàn thành
+
+✓ Toàn bộ tài liệu được duyệt
+
+✓ Có xác nhận chính thức từ chủ dự án
+
+"TÔI PHÊ DUYỆT"
+
+Nếu chưa có xác nhận này:
+
+KHÔNG ĐƯỢC CODE.

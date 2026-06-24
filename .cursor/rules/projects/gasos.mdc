@@ -1,0 +1,457 @@
+---
+description: GasOS v1.0 — quy tắc nghiệp vụ, MVP boundary, ledger, phase roadmap cho đại lý gas
+alwaysApply: true
+---
+
+# GASOS PROJECT RULE
+
+Version: 1.0
+
+---
+
+# PRODUCT VISION
+
+GasOS là hệ thống quản lý vận hành đại lý gas.
+
+KHÔNG PHẢI:
+
+* Phần mềm bán hàng
+* POS
+* ERP
+* Kế toán
+
+GasOS tập trung giải quyết:
+
+1. Công nợ
+2. Vỏ bình
+3. Gas dư
+4. Giao nhận
+5. Theo dõi vận hành
+
+---
+
+# TARGET CUSTOMER
+
+Đối tượng:
+
+* Đại lý gas nhỏ và vừa
+* 50 đến 2000 khách hàng
+* 1 đến 20 nhân viên giao hàng
+
+Không phục vụ:
+
+* Tổng đại lý cấp quốc gia
+* Doanh nghiệp ERP lớn
+
+---
+
+# MVP GOAL
+
+Chủ đại lý phải trả lời được:
+
+Khách nào đang nợ tiền?
+
+Khách nào đang giữ bao nhiêu vỏ?
+
+Tổng kg gas dư trả nhà máy?
+
+Hôm nay giao bao nhiêu bình?
+
+Nhân viên nào giao nhiều nhất?
+
+---
+
+# MVP BOUNDARY
+
+MVP chỉ được phép làm:
+
+## Customer
+
+Quản lý khách hàng
+
+---
+
+## Delivery
+
+Quản lý giao nhận
+
+---
+
+## Debt Ledger
+
+Quản lý công nợ
+
+---
+
+## Cylinder Ledger
+
+Quản lý vỏ bình
+
+---
+
+## Gas Credit Ledger
+
+Quản lý gas dư trả nhà máy (field `gas_surplus_kg` trên delivery).
+
+**Out of scope:** `gas_credit_ledger` — số dư kg khách qua nhiều lần giao.
+
+---
+
+## Dashboard
+
+Thống kê cơ bản
+
+---
+
+KHÔNG được làm:
+
+* GPS
+* Route Optimization
+* Hóa đơn điện tử
+* Kế toán
+* Mobile App Native
+* Kho nâng cao
+* AI
+* Chatbot
+* CRM
+
+Đưa vào backlog.
+
+---
+
+# CUSTOMER RULE
+
+Customer gồm:
+
+* name
+* phone
+* address
+* note
+
+Không xây:
+
+* phân nhóm khách
+* loyalty
+* marketing
+
+---
+
+# DELIVERY RULE
+
+Một Delivery là một lần giao dịch.
+
+Delivery gồm:
+
+* customer
+* employee
+* cylinders_out
+* cylinders_in
+* cash_received
+* gas_credit_received
+* note
+
+---
+
+# CYLINDER BUSINESS RULE
+
+Đây là nghiệp vụ quan trọng nhất.
+
+KHÔNG lưu:
+
+customer.currentCylinder = 10
+
+---
+
+Bắt buộc dùng Ledger.
+
+Ví dụ:
+
+Giao:
+
++4
+
+Thu:
+
+-3
+
+Hệ thống tự tính:
+
+1 vỏ đang giữ.
+
+---
+
+# DEBT BUSINESS RULE
+
+KHÔNG lưu:
+
+customer.debt = 2000000
+
+---
+
+Phải dùng:
+
+DebtLedger
+
+Ví dụ:
+
+Đơn hàng:
+
++500000
+
+Khách trả:
+
+-300000
+
+Còn:
+
+200000
+
+---
+
+# GAS DƯ (TRẢ NHÀ MÁY)
+
+Gas dư = kg gas còn trong vỏ thu về → báo cáo trả NM + trừ tiền đơn lần giao.
+
+Chỉ bình **≥ 20kg**. Không phụ thuộc loại khách (household/restaurant/industrial).
+
+---
+
+KHÔNG lưu:
+
+customer.gasCredit = 5kg
+
+---
+
+KHÔNG dùng GasCreditLedger — chỉ `delivery_lines.gas_surplus_kg` + báo cáo dashboard.
+
+Ví dụ nhập lúc giao: 5kg dư trên bình 45kg → trừ tiền + cộng vào báo cáo NM.
+
+---
+
+# DATABASE RULE
+
+Bắt buộc có:
+
+Customer
+
+Employee
+
+Delivery
+
+DebtLedger
+
+CylinderLedger
+
+GasCreditLedger
+
+---
+
+KHÔNG được tạo thêm bảng mới nếu chưa có lý do rõ ràng.
+
+---
+
+# DASHBOARD RULE
+
+Dashboard chỉ hiển thị:
+
+* Tổng đơn hôm nay
+* Tổng tiền thu hôm nay
+* Tổng công nợ
+* Tổng vỏ ngoài thị trường
+* Tổng kg gas dư trả NM
+
+Không thêm chart phức tạp.
+
+---
+
+# UI RULE
+
+Ưu tiên điện thoại.
+
+Mọi màn hình:
+
+Tối đa 3 thao tác để hoàn thành công việc.
+
+---
+
+Ví dụ:
+
+Tạo giao dịch:
+
+Chọn khách
+
+↓
+
+Nhập số liệu
+
+↓
+
+Lưu
+
+---
+
+Không được tạo wizard nhiều bước.
+
+---
+
+# API RULE
+
+Chuẩn REST.
+
+---
+
+Customer
+
+GET /customers
+
+POST /customers
+
+PUT /customers/:id
+
+---
+
+Delivery
+
+GET /deliveries
+
+POST /deliveries
+
+---
+
+Payment
+
+POST /payments
+
+---
+
+# TEST RULE
+
+Bắt buộc test:
+
+## Debt
+
+Tăng nợ
+
+Giảm nợ
+
+Số dư
+
+---
+
+## Cylinder
+
+Giao vỏ
+
+Thu vỏ
+
+Số dư
+
+---
+
+## Gas Credit
+
+Tăng
+
+Giảm
+
+Số dư
+
+---
+
+Nếu chưa có test:
+
+Không được đánh dấu hoàn thành.
+
+---
+
+# PHASE ROADMAP
+
+## Phase 1
+
+Customer
+
+Delivery
+
+Debt
+
+Dashboard
+
+---
+
+## Phase 2
+
+Cylinder Ledger
+
+Báo cáo vỏ
+
+---
+
+## Phase 3
+
+Gas Credit
+
+Báo cáo gas dư
+
+---
+
+## Phase 4
+
+GPS
+
+Google Maps
+
+---
+
+## Phase 5
+
+Điều phối giao hàng
+
+---
+
+# PHASE PROTECTION
+
+Không được sửa:
+
+API phase cũ
+
+Database phase cũ
+
+Business Rule phase cũ
+
+---
+
+Chỉ được mở rộng.
+
+---
+
+# BEFORE CODING
+
+Bắt buộc:
+
+1. Đọc docs
+2. Đọc phase hiện tại
+3. Đọc feature liên quan
+4. Phân tích
+5. Liệt kê file ảnh hưởng
+6. Liệt kê test cần viết
+7. Chờ phê duyệt
+
+Sau đó mới được code.
+
+---
+
+# DEFINITION OF DONE
+
+Một tính năng chỉ hoàn thành khi:
+
+✓ Docs hoàn thành
+
+✓ Code hoàn thành
+
+✓ Test hoàn thành
+
+✓ Self Review hoàn thành
+
+✓ Không phá phase trước
+
+✓ Có CHANGELOG
