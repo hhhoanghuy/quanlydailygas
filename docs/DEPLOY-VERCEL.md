@@ -39,6 +39,8 @@ Chỉ cần làm **một lần** trên DB Neon production.
 
 ### Biến môi trường (Vercel → Settings → Environment Variables)
 
+**Copy toàn bộ từ `.env` local** — chỉ thêm `PUBLIC_BASE_URL` là **không đủ**, app sẽ crash 500.
+
 | Biến | Ví dụ | Bắt buộc |
 |------|-------|----------|
 | `DATABASE_URL` | `postgresql://...neon...` | ✅ |
@@ -46,7 +48,7 @@ Chỉ cần làm **một lần** trên DB Neon production.
 | `TELEGRAM_BOT_USERNAME` | `quanlydailygas_bot` | ✅ |
 | `SESSION_SECRET` | chuỗi random 32+ ký tự | ✅ |
 | `NODE_ENV` | `production` | ✅ |
-| `PUBLIC_BASE_URL` | `https://ten-app.vercel.app` | ✅ |
+| `PUBLIC_BASE_URL` | `https://quanlydailygas.vercel.app` | ✅ |
 | `TELEGRAM_WEBHOOK_SECRET` | chuỗi random (tuỳ chọn, nên có) | Khuyến nghị |
 | `AGENCY_NAME` | `Đại lý Gas` | Tuỳ chọn |
 | `ENABLE_CYLINDER_LEDGER` | `true` / `false` | Tuỳ chọn |
@@ -54,11 +56,12 @@ Chỉ cần làm **một lần** trên DB Neon production.
 
 **Quan trọng:**
 
-- `PUBLIC_BASE_URL` = URL Vercel **không** có slash cuối — sau deploy lấy đúng domain (VD `https://gasos-xxx.vercel.app`).
+- `PUBLIC_BASE_URL` = URL Vercel **có https**, **không** slash cuối — VD `https://quanlydailygas.vercel.app` (không phải `codefarm.edu.vn` trừ khi domain đó trỏ đúng app).
+- Chọn **Production** (và Preview nếu cần) khi thêm biến → **Save** → **Redeploy**.
 - `NODE_ENV=production` → bot **webhook**, không polling.
 - Webhook URL mặc định: `{PUBLIC_BASE_URL}/telegram/webhook`
 
-Deploy xong → copy URL production vào `PUBLIC_BASE_URL` → **Redeploy** nếu lần đầu chưa biết URL.
+Sau khi push bản mới: nếu thiếu biến, mở `/` sẽ thấy trang **「Thiếu biến môi trường」** liệt kê cụ thể thay vì màn hình crash Vercel.
 
 ---
 
@@ -107,6 +110,8 @@ Browser  → GET  /dashboard, /api/* ─┼→ api/index.ts → Fastify (serverl
 
 | Triệu chứng | Cách xử lý |
 |--------------|------------|
+| **「Serverless Function has crashed」** ngay khi mở `/` | Thiếu `DATABASE_URL` hoặc biến bắt buộc khác — Vercel → Settings → Environment Variables → thêm **đủ** biến → Redeploy |
+| Trang **「Thiếu biến môi trường」** | Làm theo danh sách trên trang → Redeploy |
 | Bot không phản hồi | Gọi `/health` → `getWebhookInfo` → kiểm tra `PUBLIC_BASE_URL`, `NODE_ENV=production` |
 | Dashboard trắng / 500 | Xem Vercel **Functions** logs; kiểm tra `DATABASE_URL` |
 | Magic link lỗi | `PUBLIC_BASE_URL` phải khớp domain Vercel |

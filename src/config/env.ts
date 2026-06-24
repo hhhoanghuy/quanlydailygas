@@ -14,7 +14,13 @@ export function getBotUsername(): string {
 /** URL công khai của server — dùng cho magic link & webhook */
 export function getPublicBaseUrl(): string {
   const raw = process.env.PUBLIC_BASE_URL?.trim();
-  if (raw) return raw.replace(/\/$/, "");
+  if (raw) {
+    let url = raw.replace(/\/$/, "");
+    if (process.env.NODE_ENV === "production" && !/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+    return url;
+  }
   const port = process.env.PORT ?? "3000";
   return `http://localhost:${port}`;
 }

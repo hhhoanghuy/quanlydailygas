@@ -96,11 +96,15 @@ export async function startBot(app: FastifyInstance) {
       return;
     }
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
-    await bot.api.setWebhook(url, {
-      secret_token: secret || undefined,
-      drop_pending_updates: true,
-    });
-    app.log.info({ url }, "Telegram webhook registered");
+    try {
+      await bot.api.setWebhook(url, {
+        secret_token: secret || undefined,
+        drop_pending_updates: true,
+      });
+      app.log.info({ url }, "Telegram webhook registered");
+    } catch (err) {
+      app.log.error({ err, url }, "Telegram setWebhook thất bại — kiểm tra PUBLIC_BASE_URL và token");
+    }
     return;
   }
 
