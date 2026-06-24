@@ -12,7 +12,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:sync-types": "tsx src/db/sync-cylinder-types.ts"
+    "db:sync-types": "tsx src/db/sync-cylinder-types.ts",
+    "db:invite": "tsx scripts/list-invite.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

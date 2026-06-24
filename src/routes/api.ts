@@ -32,7 +32,7 @@ import {
   getCurrentPrices,
   listCylinderTypes,
 } from "../services/price-period.service.js";
-import { listEmployees, listTeamMembers, setEmployeeActive } from "../services/employee.service.js";
+import { listEmployees, listTeamMembers, setEmployeeActive, updateEmployee } from "../services/employee.service.js";
 import { getGasSurplusDashboard } from "../services/gas-surplus.service.js";
 import { getOrderDetailForWeb, listOrders, previewOrderCorrection, correctCompletedOrder } from "../services/order.service.js";
 import type { OrderCorrectionInput } from "../services/order.service.js";
@@ -261,6 +261,14 @@ export async function registerApiRoutes(app: FastifyInstance) {
         const { id } = req.params as { id: string };
         const body = req.body as { active: boolean };
         return setEmployeeActive(api.db, id, body.active);
+      });
+
+        secured.patch("/employees/:id", async (req) => {
+        assertOwner(req.user!);
+        const { id } = req.params as { id: string };
+        const body = req.body as { name?: string; phone?: string };
+        const row = await updateEmployee(api.db, id, body);
+        return { id: row.id, name: row.name, phone: row.phone, active: row.active };
       });
 
         secured.get("/cylinders/holders", async (req) => {

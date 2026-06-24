@@ -323,7 +323,10 @@ textarea { min-height: 72px; resize: vertical; }
 .correction-preview-item .delta {
   font-weight: 700; color: var(--accent); text-align: right; white-space: nowrap;
 }
-.correction-preview-foot { margin: .65rem 0 0; font-size: .78rem; }
+  .correction-preview-foot { margin: .65rem 0 0; font-size: .78rem; }
+
+.cell-actions { white-space: nowrap; }
+.cell-actions .btn { margin: .15rem .1rem; }
 
 .row-clickable { cursor: pointer; }
 .row-clickable:hover td { background: #eff6ff !important; }
@@ -468,6 +471,9 @@ textarea { min-height: 72px; resize: vertical; }
   .correction-line-fields { grid-template-columns: repeat(3, 1fr); gap: .4rem; }
   .correction-field input { font-size: 16px; min-height: 44px; }
   .correction-field label { font-size: .7rem; }
+
+  .cell-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .cell-actions .btn { flex: 1; min-width: 72px; min-height: 40px; }
 
   .modal { max-height: 95dvh; margin: 0; border-radius: 16px 16px 0 0; width: 100%; }
   .modal-foot { flex-wrap: wrap; }

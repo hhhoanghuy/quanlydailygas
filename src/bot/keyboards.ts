@@ -4,13 +4,17 @@ export function mainMenu(role: string) {
   if (role === "employee") {
     return new InlineKeyboard()
       .text("📋 Đơn cần giao", "orders_list")
-      .text("💰 Tra nợ", "debt_check");
+      .text("💰 Tra nợ", "debt_check")
+      .row()
+      .text("💵 Thu nợ", "payment_collect");
   }
   return new InlineKeyboard()
     .text("📞 Lên đơn", "order_new")
     .text("👤 Khách", "customers")
     .row()
     .text("📋 Đơn mở", "orders_list")
+    .text("💵 Thu nợ", "payment_collect")
+    .row()
     .text("📊 Thống kê", "stats")
     .row()
     .text("⚙️ Cài đặt", "settings");

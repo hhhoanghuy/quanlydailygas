@@ -1,7 +1,8 @@
 import { eq, and, count, gte, lte, or, isNull } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { deliveries, employees, users } from "../db/schema.js";
-import { notFoundError } from "../../utils/errors.js";
+import { notFoundError, validationError } from "../../utils/errors.js";
+import { normalizePhone } from "../../utils/phone.js";
 
 function monthRange(date = new Date()) {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -146,12 +147,6 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
   return result;
 }
 
-/** @deprecated dùng listTeamMembers — giữ tương thích API cũ */
-export async function listEmployees(db: Db) {
-  const team = await listTeamMembers(db);
-  return team.filter((m) => !m.isOwner);
-}
-
 export async function setEmployeeActive(db: Db, id: string, active: boolean) {
   const [ownerLink] = await db
     .select({ employeeId: users.employeeId })
@@ -168,5 +163,36 @@ export async function setEmployeeActive(db: Db, id: string, active: boolean) {
     .where(eq(employees.id, id))
     .returning();
   if (!row) throw notFoundError("Nhân viên không tồn tại");
+  return row;
+}
+
+/** @deprecated dùng listTeamMembers — giữ tương thích API cũ */
+export async function listEmployees(db: Db) {
+  const team = await listTeamMembers(db);
+  return team.filter((m) => !m.isOwner);
+}
+
+export async function updateEmployee(
+  db: Db,
+  id: string,
+  input: { name?: string; phone?: string },
+) {
+  const name = input.name?.trim();
+  const phoneRaw = input.phone?.trim();
+  if (!name && !phoneRaw) throw validationError("Cần tên hoặc SĐT");
+
+  const [existing] = await db.select().from(employees).where(eq(employees.id, id)).limit(1);
+  if (!existing) throw notFoundError("Nhân viên không tồn tại");
+
+  const updates: { name?: string; phone?: string } = {};
+  if (name) updates.name = name;
+  if (phoneRaw) updates.phone = normalizePhone(phoneRaw);
+
+  const [row] = await db.update(employees).set(updates).where(eq(employees.id, id)).returning();
+
+  if (name) {
+    await db.update(users).set({ name }).where(eq(users.employeeId, id));
+  }
+
   return row;
 }

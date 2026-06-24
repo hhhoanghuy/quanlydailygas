@@ -10,6 +10,7 @@ import {
   searchCustomers,
 } from "../services/customer.service.js";
 import { getStatsByDay, getStatsByEmployee, getStatsOrders } from "../services/stats.service.js";
+import { createPayment } from "../services/payment.service.js";
 import { clearSession, getSession, setSession, type CustomerDraft } from "./session.js";
 import { tryActivateFromText } from "./activation.js";
 import { handleOrderCallback, handleOrderText } from "./order-flow.js";
@@ -97,6 +98,19 @@ async function handleCallback(
   if (data === "debt_check") {
     setSession(ctx.from!.id, { step: "debt_phone" });
     await ctx.reply("💰 Tra nợ\nNhập tên, SĐT hoặc địa chỉ khách:");
+    return;
+  }
+
+  if (data === "payment_collect") {
+    setSession(ctx.from!.id, { step: "payment_search" });
+    await ctx.reply("💵 Thu nợ\nNhập tên, SĐT hoặc địa chỉ khách:");
+    return;
+  }
+
+  if (data.startsWith("payment_pick:")) {
+    const customerId = data.slice("payment_pick:".length);
+    clearSession(ctx.from!.id);
+    await startPaymentFlow(ctx, db, ctx.from!.id, customerId);
     return;
   }
 
@@ -289,6 +303,16 @@ async function handleText(
     return true;
   }
 
+  if (step === "payment_search") {
+    await processPaymentSearch(ctx, db, telegramId, text);
+    return true;
+  }
+
+  if (step === "payment_input") {
+    await processPaymentInput(ctx, db, telegramId, text, user);
+    return true;
+  }
+
   if (step === "search_query" || step === "customer_search") {
     requireOwner(user);
     await processCustomerSearch(ctx, db, telegramId, text);
@@ -333,6 +357,8 @@ async function replyUnknownInput(ctx: Context, user: BotUser, step: string) {
     customer_confirm: "Bấm ✅ Lưu để xác nhận hoặc gửi lại thông tin khách.",
     customer_search: "Gõ tên, SĐT hoặc địa chỉ khách để tìm.",
     debt_phone: "Nhập tên, SĐT hoặc địa chỉ khách để tra nợ.",
+    payment_search: "Nhập tên, SĐT hoặc địa chỉ khách để thu nợ.",
+    payment_input: "Nhập: <số tiền> tm hoặc ck. VD: 500000 tm",
     order_customer_phone: "Nhập SĐT, tên hoặc địa chỉ khách để lên đơn.",
     order_line_qty: "Nhập số bình cần giao (VD: 4).",
     fulfill_compact:
@@ -420,15 +446,13 @@ async function replyDebtCard(
   customerId: string,
 ) {
   const { customer, debtBalance } = await getCustomerDetail(db, customerId);
-  const kb =
-    user.role === "owner"
-      ? new InlineKeyboard()
-          .text("📞 Lên đơn", `order_for_customer:${customerId}`)
-          .row()
-          .text("◀️ Menu", "menu")
-      : new InlineKeyboard()
-          .text("📋 Đơn cần giao", "orders_list")
-          .text("◀️ Menu", "menu");
+  const kb = new InlineKeyboard();
+  if (user.role === "owner") {
+    kb.text("📞 Lên đơn", `order_for_customer:${customerId}`).row();
+  } else {
+    kb.text("📋 Đơn cần giao", "orders_list").row();
+  }
+  kb.text("💵 Thu nợ", `payment_pick:${customerId}`).row().text("◀️ Menu", "menu");
   await ctx.reply(
     [
       `💰 ${customer.name}`,
@@ -474,6 +498,120 @@ async function processDebtSearch(
   await ctx.reply(
     `✅ Tìm thấy ${results.length} khách — nhấn để xem nợ:\n\n${lines.join("\n\n")}`,
     { reply_markup: kb },
+  );
+}
+
+function parsePaymentInput(text: string): { amount: number; method: "cash" | "transfer" } | null {
+  const normalized = text.trim().toLowerCase().replace(/,/g, "").replace(/\s+/g, " ");
+  const m = normalized.match(/^(\d+)\s*(tm|ck)?$/);
+  if (!m) return null;
+  const amount = Number(m[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const tag = m[2] ?? "tm";
+  return { amount, method: tag === "ck" ? "transfer" : "cash" };
+}
+
+async function startPaymentFlow(
+  ctx: Context,
+  db: Db,
+  telegramId: number,
+  customerId: string,
+) {
+  const { customer, debtBalance } = await getCustomerDetail(db, customerId);
+  setSession(telegramId, {
+    step: "payment_input",
+    paymentDraft: { customerId, customerName: customer.name },
+  });
+  await ctx.reply(
+    [
+      `💵 Thu nợ — ${customer.name}`,
+      `Đang nợ: ${debtBalance.toLocaleString("vi-VN")}đ`,
+      "",
+      "Nhập: <số tiền> tm hoặc ck",
+      "VD: 500000 tm",
+      "VD: 300000 ck",
+    ].join("\n"),
+    { reply_markup: new InlineKeyboard().text("❌ Huỷ", "menu") },
+  );
+}
+
+async function processPaymentSearch(
+  ctx: Context,
+  db: Db,
+  telegramId: number,
+  text: string,
+) {
+  const results = await searchCustomerDebt(db, text);
+  clearSession(telegramId);
+
+  if (!results.length) {
+    await ctx.reply(`❌ Không tìm thấy khách với "${text}"`, { reply_markup: backMenu() });
+    return;
+  }
+
+  if (results.length === 1) {
+    await startPaymentFlow(ctx, db, telegramId, results[0].id);
+    return;
+  }
+
+  const lines = results.map((c) =>
+    formatCustomerSearchLine(c, ` (nợ ${c.debtBalance.toLocaleString("vi-VN")}đ)`),
+  );
+  const kb = new InlineKeyboard();
+  for (const c of results) {
+    kb.text(customerPickButtonLabel(c), `payment_pick:${c.id}`).row();
+  }
+  kb.text("◀️ Menu", "menu");
+
+  await ctx.reply(
+    `✅ Tìm thấy ${results.length} khách — chọn để thu nợ:\n\n${lines.join("\n\n")}`,
+    { reply_markup: kb },
+  );
+}
+
+async function processPaymentInput(
+  ctx: Context,
+  db: Db,
+  telegramId: number,
+  text: string,
+  user: BotUser,
+) {
+  const session = getSession(telegramId);
+  const draft = session.paymentDraft;
+  if (!draft) {
+    clearSession(telegramId);
+    await ctx.reply("❌ Phiên thu nợ hết hạn — bấm 💵 Thu nợ trong menu.", {
+      reply_markup: mainMenu(user.role),
+    });
+    return;
+  }
+
+  const parsed = parsePaymentInput(text);
+  if (!parsed) {
+    await ctx.reply("❌ Sai format. VD: 500000 tm hoặc 300000 ck", {
+      reply_markup: new InlineKeyboard().text("❌ Huỷ", "menu"),
+    });
+    return;
+  }
+
+  const result = await createPayment(db, {
+    customerId: draft.customerId,
+    amount: parsed.amount,
+    method: parsed.method,
+    paidAt: new Date(),
+  });
+
+  clearSession(telegramId);
+
+  const methodLabel = parsed.method === "transfer" ? "Chuyển khoản" : "Tiền mặt";
+  await ctx.reply(
+    [
+      "✅ Đã ghi thu nợ",
+      `👤 ${draft.customerName}`,
+      `💵 ${parsed.amount.toLocaleString("vi-VN")}đ (${methodLabel})`,
+      `💰 Còn nợ: ${result.debtBalance.toLocaleString("vi-VN")}đ`,
+    ].join("\n"),
+    { reply_markup: mainMenu(user.role) },
   );
 }
 

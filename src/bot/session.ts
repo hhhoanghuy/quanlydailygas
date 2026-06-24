@@ -11,7 +11,9 @@ export type SessionStep =
   | "settings_price_amount"
   | "delivery_phone"
   | "delivery_line"
-  | "delivery_cash";
+  | "delivery_cash"
+  | "payment_search"
+  | "payment_input";
 
 export interface CustomerDraft {
   name: string;
@@ -77,6 +79,11 @@ export interface PriceEditDraft {
   cylinderName: string;
 }
 
+export interface PaymentDraft {
+  customerId: string;
+  customerName: string;
+}
+
 export interface ChatSession {
   step: SessionStep;
   delivery?: DeliveryDraft;
@@ -84,6 +91,7 @@ export interface ChatSession {
   orderDraft?: OrderDraft;
   fulfillDraft?: FulfillDraft;
   priceEditDraft?: PriceEditDraft;
+  paymentDraft?: PaymentDraft;
 }
 
 const sessions = new Map<number, ChatSession>();

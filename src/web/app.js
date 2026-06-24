@@ -691,10 +691,31 @@ const pages = {
     setPageSub("Chủ đại lý và nhân viên giao hàng — phân vai trò rõ ràng");
     setPageActions(`<button class="btn btn-primary" id="em-invite">+ Tạo mã mời NV</button>`);
     el.innerHTML = `<div id="em-body"><p class="empty">Đang tải…</p></div>`;
+    let teamCache = [];
+
+    const openEdit = (member) => {
+      showModal(
+        `Sửa — ${member.roleLabel}`,
+        `<div class="field"><label>Tên hiển thị</label><input id="em-edit-name" value="${esc(member.name)}" /></div>
+         <div class="field"><label>Số điện thoại</label><input id="em-edit-phone" value="${esc(member.phone)}" inputmode="tel" /></div>
+         <p class="muted" style="margin:0;font-size:.8rem">Tên cũng cập nhật trên Telegram (nếu đã kích hoạt).</p>`,
+        async () => {
+          await api(`/employees/${member.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: document.getElementById("em-edit-name").value.trim(),
+              phone: document.getElementById("em-edit-phone").value.trim(),
+            }),
+          });
+          await load();
+        },
+      );
+    };
 
     const load = async () => {
       const { team, owner } = await api("/employees");
       const members = team || [];
+      teamCache = owner ? [owner, ...members.filter((m) => !m.isOwner)] : members;
 
       const ownerRow = owner
         ? `<tr class="row-owner">
@@ -703,7 +724,7 @@ const pages = {
         <td>${owner.telegramUsername ? "@" + owner.telegramUsername : '<span class="badge badge-ok">Telegram OK</span>'}</td>
         <td>${owner.deliveriesThisMonth}</td>
         <td><span class="badge badge-ok">Hoạt động</span></td>
-        <td class="muted">—</td>
+        <td><button class="btn btn-sm" data-edit="${owner.id}">Sửa</button></td>
       </tr>`
         : "";
 
@@ -715,16 +736,15 @@ const pages = {
               ? "@" + e.telegramUsername
               : '<span class="badge badge-ok">Telegram OK</span>'
             : '<span class="badge badge-pending">Chưa kích hoạt</span>';
-          const actions = e.isOwner
-            ? '<span class="muted">—</span>'
-            : `<button class="btn btn-sm" data-toggle="${e.id}" data-active="${e.active}">${e.active ? "Ngưng" : "Bật lại"}</button>`;
+          const actions = `<button class="btn btn-sm" data-edit="${e.id}">Sửa</button>
+            <button class="btn btn-sm" data-toggle="${e.id}" data-active="${e.active}">${e.active ? "Ngưng" : "Bật lại"}</button>`;
           return `<tr>
         <td>${roleBadge(e.role)}</td>
         <td><strong>${e.name}</strong></td><td>${e.phone}</td>
         <td>${tg}</td>
         <td>${e.deliveriesThisMonth}</td>
         <td>${e.active ? '<span class="badge badge-ok">Hoạt động</span>' : '<span class="badge badge-off">Ngưng</span>'}</td>
-        <td>${actions}</td>
+        <td class="cell-actions">${actions}</td>
       </tr>`;
         });
 
@@ -739,7 +759,7 @@ const pages = {
           "Đội ngũ",
           "",
           table(
-            ["Vai trò", "Tên", "SĐT", "Telegram", "Đơn/tháng", "Trạng thái", ""],
+            ["Vai trò", "Tên", "SĐT", "Telegram", "Đơn/tháng", "Trạng thái", "Thao tác"],
             ownerRow ? [ownerRow, ...nvRows] : nvRows,
           ),
         )}
@@ -748,6 +768,12 @@ const pages = {
           <strong>Nhân viên</strong> (employee): giao hàng qua bot Telegram.<br />
           <strong>Chưa kích hoạt</strong>: đã tạo hồ sơ NV nhưng chưa /start mã mời.
         </p>`;
+      el.querySelectorAll("[data-edit]").forEach((btn) => {
+        btn.onclick = () => {
+          const m = teamCache.find((x) => x.id === btn.dataset.edit);
+          if (m) openEdit(m);
+        };
+      });
       el.querySelectorAll("[data-toggle]").forEach((btn) => btn.onclick = async () => {
         await api(`/employees/${btn.dataset.toggle}/active`, {
           method: "PATCH", body: JSON.stringify({ active: btn.dataset.active !== "true" }),
