@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{AGENCY_NAME}} — Đã sẵn sàng</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --card: #fff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --success: #16a34a;
+      --border: #e5e7eb;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      line-height: 1.55;
+    }
+    .card {
+      background: var(--card);
+      max-width: 440px;
+      width: 100%;
+      padding: 2rem 1.75rem;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 14px rgba(0,0,0,.06);
+      text-align: center;
+    }
+    .logo {
+      width: 56px; height: 56px; margin: 0 auto 1rem;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #fff; font-size: 1.5rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    h1 { margin: 0 0 .35rem; font-size: 1.35rem; }
+    .status {
+      display: inline-flex; align-items: center; gap: .4rem;
+      margin: .75rem 0 1.25rem; padding: .35rem .85rem;
+      background: #ecfdf5; color: var(--success);
+      border-radius: 999px; font-size: .875rem; font-weight: 600;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+    .steps {
+      text-align: left; margin: 1.25rem 0;
+      padding: 1rem 1.1rem; background: #f9fafb;
+      border: 1px solid var(--border); border-radius: 10px;
+      font-size: .9rem;
+    }
+    .steps ol { margin: .5rem 0 0; padding-left: 1.2rem; }
+    .steps li { margin: .45rem 0; }
+    .steps code { background: #eef2ff; padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
+    .muted { color: var(--muted); font-size: .875rem; }
+    .btn {
+      display: inline-block; margin-top: 1rem; padding: .7rem 1.25rem;
+      background: var(--accent); color: #fff; text-decoration: none;
+      border-radius: 8px; font-weight: 600; font-size: .95rem;
+    }
+    .btn:hover { filter: brightness(1.05); }
+    .foot { margin-top: 1.25rem; font-size: .8rem; color: var(--muted); }
+    #health-err { color: #dc2626; font-size: .85rem; margin-top: .5rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">{{INITIAL}}</div>
+    <h1>{{AGENCY_NAME}}</h1>
+    <div class="status" id="status-ok">
+      <span class="status-dot"></span>
+      <span>Deploy thành công — hệ thống OK</span>
+    </div>
+    <p class="muted">Server đang chạy. Bắt đầu bằng Telegram bot.</p>
+
+    <div class="steps">
+      <strong>Đăng nhập &amp; dùng thử</strong>
+      <ol>
+        <li>Mở bot Telegram: <a href="{{BOT_LINK}}" target="_blank" rel="noopener">@{{BOT_USERNAME}}</a></li>
+        <li>Chủ đại lý: kích hoạt bằng mã mời — <code>/start GAS-XXXXXXXX</code></li>
+        <li>Nhân viên: bấm link mời từ chủ hoặc <code>/start</code> + mã</li>
+        <li>Gõ <code>/menu</code> để vào menu bot</li>
+        <li>Chủ mở web: <code>/dashboard</code> → bấm link hoặc nút <strong>Mở Dashboard</strong></li>
+      </ol>
+    </div>
+
+    <a class="btn" href="{{BOT_LINK}}" target="_blank" rel="noopener">Mở Telegram Bot</a>
+    <p id="health-err">Không kết nối được API — kiểm tra log deploy.</p>
+    <p class="foot">Dashboard web: <a href="/dashboard">/dashboard</a> (cần link từ bot)</p>
+  </div>
+  <script>
+    fetch("/health").then(function (r) {
+      if (!r.ok) throw new Error("health fail");
+      return r.json();
+    }).then(function (d) {
+      if (d.status !== "ok") throw new Error("bad status");
+    }).catch(function () {
+      document.getElementById("status-ok").style.background = "#fef2f2";
+      document.getElementById("status-ok").style.color = "#dc2626";
+      document.getElementById("status-ok").innerHTML = "<span>⚠</span><span>Server chạy nhưng /health lỗi</span>";
+      document.getElementById("health-err").style.display = "block";
+    });
+  </script>
+</body>
+</html>

@@ -1,10 +1,20 @@
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { FastifyInstance } from "fastify";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const webDir = join(__dirname, "../web");
+
+function resolveWebDir(): string {
+  const candidates = [join(__dirname, "../web"), join(process.cwd(), "src/web")];
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+  throw new Error("Không tìm thấy thư mục src/web");
+}
+
+const webDir = resolveWebDir();
 
 const cache = new Map<string, string>();
 
@@ -19,8 +29,29 @@ function agencyName() {
   return process.env.AGENCY_NAME?.trim() || "GasOS";
 }
 
+function botUsername() {
+  return process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "") || "your_bot";
+}
+
+function renderLanding(html: string) {
+  const agency = agencyName();
+  const bot = botUsername();
+  const initial = agency.charAt(0).toUpperCase() || "G";
+  return html
+    .replaceAll("{{AGENCY_NAME}}", agency)
+    .replaceAll("{{BOT_USERNAME}}", bot)
+    .replaceAll("{{BOT_LINK}}", `https://t.me/${bot}`)
+    .replaceAll("{{INITIAL}}", initial);
+}
+
 export async function registerDashboardWeb(app: FastifyInstance) {
   const isDev = process.env.NODE_ENV !== "production";
+
+  app.get("/", async (_req, reply) => {
+    if (isDev) cache.delete("landing.html");
+    const html = await loadWebFile("landing.html");
+    return reply.type("text/html; charset=utf-8").send(renderLanding(html));
+  });
 
   app.get("/dashboard/app.css", async (_req, reply) => {
     if (isDev) cache.delete("app.css");

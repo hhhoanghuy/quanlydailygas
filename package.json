@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node --input-type=module -e \"import { cpSync } from 'node:fs'; cpSync('src/web','dist/src/web',{ recursive: true });\"",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -15,11 +15,11 @@
     "db:sync-types": "tsx src/db/sync-cylinder-types.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.2",
     "@neondatabase/serverless": "^0.10.4",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "fastify": "^5.2.1",
-    "@fastify/cors": "^10.0.2",
     "grammy": "^1.35.0",
     "nanoid": "^5.0.9",
     "zod": "^3.24.1"
