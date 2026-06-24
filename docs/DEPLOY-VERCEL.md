@@ -58,7 +58,7 @@ Chỉ cần làm **một lần** trên DB Neon production.
 
 - `PUBLIC_BASE_URL` = URL Vercel **có https**, **không** slash cuối — VD `https://quanlydailygas.vercel.app` (không phải `codefarm.edu.vn` trừ khi domain đó trỏ đúng app).
 - Chọn **Production** (và Preview nếu cần) khi thêm biến → **Save** → **Redeploy**.
-- `NODE_ENV=production` → bot **webhook**, không polling.
+- `NODE_ENV=production` → bot **webhook**, không polling. Trên Vercel **không** đặt `NODE_ENV=development` (copy từ `.env` local) — app tự dùng production khi `VERCEL_ENV=production`.
 - Webhook URL mặc định: `{PUBLIC_BASE_URL}/telegram/webhook`
 
 Sau khi push bản mới: nếu thiếu biến, mở `/` sẽ thấy trang **「Thiếu biến môi trường」** liệt kê cụ thể thay vì màn hình crash Vercel.

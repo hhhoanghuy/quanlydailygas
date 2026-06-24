@@ -5,17 +5,30 @@ import { startBot } from "./bot/telegram.js";
 
 let app: FastifyInstance | undefined;
 
+function ensureProductionMode() {
+  if (process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production") {
+    process.env.NODE_ENV = "production";
+  }
+}
+
+function isProductionDeploy(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production"
+  );
+}
+
 function collectConfigErrors(): string[] {
   const missing: string[] = [];
   if (!process.env.DATABASE_URL?.trim()) missing.push("DATABASE_URL");
   if (!process.env.TELEGRAM_BOT_TOKEN?.trim()) missing.push("TELEGRAM_BOT_TOKEN");
   if (!process.env.TELEGRAM_BOT_USERNAME?.trim()) missing.push("TELEGRAM_BOT_USERNAME");
   if (!process.env.SESSION_SECRET?.trim()) missing.push("SESSION_SECRET");
-  if (process.env.NODE_ENV !== "production") missing.push("NODE_ENV=production");
+  if (!isProductionDeploy()) missing.push("NODE_ENV=production (hoặc Vercel Production)");
 
   const base = process.env.PUBLIC_BASE_URL?.trim();
   if (!base) {
-    missing.push("PUBLIC_BASE_URL (https://ten-app.vercel.app)");
+    missing.push("PUBLIC_BASE_URL (https://quanlydailygas.vercel.app)");
   }
 
   return missing;
@@ -39,6 +52,26 @@ ol{margin:.75rem 0 0 1.1rem}p{color:#4b5563}</style></head>
   res.end(html);
 }
 
+function requestUrl(req: IncomingMessage): string {
+  const raw = req.url || "/";
+  if (raw === "/api" || raw.startsWith("/api?")) {
+    return raw.replace(/^\/api(\?|$)/, "/$1") || "/";
+  }
+  return raw;
+}
+
+async function readBody(req: IncomingMessage): Promise<string | undefined> {
+  const method = (req.method || "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") return undefined;
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const body = Buffer.concat(chunks).toString("utf8");
+  return body.length ? body : undefined;
+}
+
 async function ensureReady() {
   if (app) return app;
   app = await buildApp();
@@ -49,8 +82,10 @@ async function ensureReady() {
   return app;
 }
 
-/** Entry cho Vercel — Fastify nhận req/res Node HTTP */
+/** Entry cho Vercel — Fastify inject thay vì server.emit */
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  ensureProductionMode();
+
   const configErrors = collectConfigErrors();
   if (configErrors.length) {
     sendConfigErrorPage(res, configErrors);
@@ -59,7 +94,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   try {
     const instance = await ensureReady();
-    instance.server.emit("request", req, res);
+    const response = await instance.inject({
+      method: (req.method || "GET").toUpperCase() as "DELETE" | "GET" | "HEAD" | "OPTIONS" | "PATCH" | "POST" | "PUT",
+      url: requestUrl(req),
+      headers: req.headers as Record<string, string | string[] | undefined>,
+      payload: await readBody(req),
+    });
+
+    res.statusCode = response.statusCode;
+    for (const [key, value] of Object.entries(response.headers)) {
+      if (value === undefined) continue;
+      res.setHeader(key, value);
+    }
+    res.end(response.body);
   } catch (err) {
     console.error("Serverless handler error:", err);
     if (!res.headersSent) {
