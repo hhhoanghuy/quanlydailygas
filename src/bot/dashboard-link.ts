@@ -6,7 +6,6 @@ import type { users } from "../db/schema.js";
 
 type BotUser = typeof users.$inferSelect;
 
-/** Telegram inline URL button chỉ ổn định với HTTPS công khai */
 function canUseInlineUrlButton(url: string): boolean {
   try {
     return new URL(url).protocol === "https:";
@@ -19,23 +18,26 @@ export async function sendDashboardLink(ctx: Context, db: Db, user: BotUser) {
   assertOwner(user);
   const link = await createMagicLink(db, user.id);
 
-  const text = [
-    "🌐 Web Dashboard",
-    `Link đăng nhập (dùng 1 lần, hết hạn sau ${link.expiresInMinutes} phút):`,
-    link.url,
-    "",
-    "Chạm link xanh ở trên để mở.",
-    "Sau khi vào, dashboard dùng được 8 giờ.",
-    "Link hết hạn chỉ áp dụng nếu chưa kịp đăng nhập — không ảnh hưởng phiên đang mở.",
-  ].join("\n");
-
-  const replyOpts = { link_preview_options: { is_disabled: true } as const };
-
   if (canUseInlineUrlButton(link.url)) {
-    const keyboard = new InlineKeyboard().url("🌐 Mở Dashboard", link.url);
-    await ctx.reply(text, { ...replyOpts, reply_markup: keyboard });
+    // HTTPS: hiển thị chữ + nút inline — URL ẩn trong nút
+    const keyboard = new InlineKeyboard().url("🌐 Đăng nhập Dashboard", link.url);
+    await ctx.reply(
+      `🌐 <b>Web Dashboard</b>\n\nBấm nút bên dưới để đăng nhập.\nLink dùng <b>1 lần</b>, hết hạn sau <b>${link.expiresInMinutes} phút</b>.\nSau khi vào, phiên dùng được <b>8 giờ</b>.`,
+      {
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+        reply_markup: keyboard,
+      },
+    );
     return;
   }
 
-  await ctx.reply(text, replyOpts);
+  // localhost / dev: dùng HTML hyperlink — chữ hiển thị, URL ẩn dưới
+  await ctx.reply(
+    `🌐 <b>Web Dashboard</b>\n\n<a href="${link.url}">Đăng nhập Dashboard</a>\n\n(Di chuột vào chữ xanh để thấy link)\nLink dùng <b>1 lần</b>, hết hạn sau <b>${link.expiresInMinutes} phút</b>.`,
+    {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    },
+  );
 }
