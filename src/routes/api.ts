@@ -6,6 +6,7 @@ import {
   buildInviteDeepLink,
   createInviteCode,
   exchangeMagicLink,
+  loginWithTelegramWebApp,
   revokeSession,
 } from "../services/auth.service.js";
 import {
@@ -76,6 +77,13 @@ export async function registerApiRoutes(app: FastifyInstance) {
       api.post("/auth/magic-link", async (req) => {
         const body = req.body as { code?: string };
         return exchangeMagicLink(api.db, body.code ?? "");
+      });
+
+      /** Đăng nhập qua Telegram WebApp — xác minh initData (chữ ký Telegram), không cần magic link */
+      api.post("/auth/telegram/webapp", async (req) => {
+        const body = req.body as { init_data?: string };
+        if (!body.init_data?.trim()) throw validationError("Thiếu init_data");
+        return loginWithTelegramWebApp(api.db, body.init_data.trim());
       });
 
       await api.register(async (secured) => {

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{AGENCY_NAME}} — Dashboard</title>
   <link rel="stylesheet" href="/dashboard/app.css" />
+  <!-- Telegram WebApp SDK — cần thiết để đọc initData khi mở qua bot -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body data-agency="{{AGENCY_NAME}}">
 
@@ -12,8 +14,8 @@
     <div class="login-box">
       <div class="login-logo">G</div>
       <h1>{{AGENCY_NAME}}</h1>
-      <p>Mở link từ Telegram bot — lệnh <strong>/dashboard</strong></p>
-      <p class="muted">Link chỉ dùng <strong>một lần</strong>, hết hạn sau 5 phút.<br />Sau khi vào, phiên làm việc giữ <strong>8 giờ</strong> — link hết hạn không ảnh hưởng phiên đang mở.</p>
+      <p>Gõ <strong>/dashboard</strong> trong bot Telegram → bấm nút <strong>Đăng nhập Dashboard</strong></p>
+      <p class="muted">Telegram xác nhận danh tính tự động — không cần nhập mật khẩu.<br />Phiên làm việc giữ <strong>8 giờ</strong>.</p>
       <p id="login-err" class="error"></p>
     </div>
   </div>

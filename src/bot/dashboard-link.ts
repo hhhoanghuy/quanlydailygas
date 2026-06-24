@@ -1,43 +1,33 @@
 import type { Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import type { Db } from "../db/index.js";
-import { createMagicLink, assertOwner } from "../services/auth.service.js";
+import { assertOwner } from "../services/auth.service.js";
+import { getPublicBaseUrl } from "../config/env.js";
 import type { users } from "../db/schema.js";
 
 type BotUser = typeof users.$inferSelect;
 
-function canUseInlineUrlButton(url: string): boolean {
-  try {
-    return new URL(url).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-export async function sendDashboardLink(ctx: Context, db: Db, user: BotUser) {
+export async function sendDashboardLink(ctx: Context, _db: Db, user: BotUser) {
   assertOwner(user);
-  const link = await createMagicLink(db, user.id);
 
-  if (canUseInlineUrlButton(link.url)) {
-    // HTTPS: hiển thị chữ + nút inline — URL ẩn trong nút
-    const keyboard = new InlineKeyboard().url("🌐 Đăng nhập Dashboard", link.url);
+  const base = getPublicBaseUrl();
+  const dashUrl = `${base}/dashboard`;
+  const isHttps = dashUrl.startsWith("https://");
+
+  if (isHttps) {
+    // Production: dùng WebApp button — Telegram ký initData bằng bot token
+    // Server xác minh chữ ký → không có token nào trong URL
+    const keyboard = new InlineKeyboard().webApp("🌐 Đăng nhập Dashboard", dashUrl);
     await ctx.reply(
-      `🌐 <b>Web Dashboard</b>\n\nBấm nút bên dưới để đăng nhập.\nLink dùng <b>1 lần</b>, hết hạn sau <b>${link.expiresInMinutes} phút</b>.\nSau khi vào, phiên dùng được <b>8 giờ</b>.`,
-      {
-        parse_mode: "HTML",
-        link_preview_options: { is_disabled: true },
-        reply_markup: keyboard,
-      },
+      "🌐 <b>Web Dashboard</b>\n\nBấm nút bên dưới — Telegram xác nhận danh tính tự động.\nKhông có link, không có token lộ ra ngoài.",
+      { parse_mode: "HTML", reply_markup: keyboard },
     );
     return;
   }
 
-  // localhost / dev: dùng HTML hyperlink — chữ hiển thị, URL ẩn dưới
+  // Dev localhost: WebApp không chạy được — fallback plain URL
   await ctx.reply(
-    `🌐 <b>Web Dashboard</b>\n\n<a href="${link.url}">Đăng nhập Dashboard</a>\n\n(Di chuột vào chữ xanh để thấy link)\nLink dùng <b>1 lần</b>, hết hạn sau <b>${link.expiresInMinutes} phút</b>.`,
-    {
-      parse_mode: "HTML",
-      link_preview_options: { is_disabled: true },
-    },
+    `🌐 <b>Web Dashboard (dev)</b>\n\n${dashUrl}\n\n<i>Chạy local — chưa qua xác thực Telegram WebApp.</i>`,
+    { parse_mode: "HTML", link_preview_options: { is_disabled: true } },
   );
 }

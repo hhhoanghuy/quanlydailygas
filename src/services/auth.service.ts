@@ -1,4 +1,5 @@
 import { eq, and, gt } from "drizzle-orm";
+import { createHmac, createHash } from "node:crypto";
 import { customAlphabet } from "nanoid";
 import type { Db } from "../db/index.js";
 import {
@@ -252,6 +253,66 @@ export function normalizeInviteCode(raw: string): string {
     throw validationError("Mã mời không hợp lệ");
   }
   return `GAS-${trimmed}`;
+}
+
+/**
+ * Xác minh initData do Telegram WebApp gửi kèm.
+ * Trả về object user nếu hợp lệ, throw nếu sai chữ ký hoặc hết hạn (5 phút).
+ */
+export function verifyTelegramWebAppInitData(initData: string): {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+} {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!botToken) throw unauthorizedError("TELEGRAM_BOT_TOKEN chưa cấu hình");
+
+  const params = new URLSearchParams(initData);
+  const hash = params.get("hash");
+  if (!hash) throw unauthorizedError("initData thiếu hash");
+
+  params.delete("hash");
+  const dataCheckString = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+
+  const secretKey = createHmac("sha256", "WebAppData").update(botToken).digest();
+  const expectedHash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+
+  if (expectedHash !== hash) throw unauthorizedError("initData chữ ký không hợp lệ");
+
+  const authDate = Number(params.get("auth_date") || "0");
+  const age = Math.floor(Date.now() / 1000) - authDate;
+  // Cho phép tối đa 5 phút — đủ cho cold start serverless
+  if (age > 300) throw unauthorizedError("initData đã hết hạn (5 phút) — mở lại từ bot");
+
+  const userJson = params.get("user");
+  if (!userJson) throw unauthorizedError("initData thiếu thông tin user");
+
+  return JSON.parse(userJson) as { id: number; first_name?: string; last_name?: string; username?: string };
+}
+
+/**
+ * Đăng nhập qua Telegram WebApp: xác minh initData → tìm user → tạo phiên web.
+ * Chỉ user đã kích hoạt (có trong bảng users) mới đăng nhập được.
+ */
+export async function loginWithTelegramWebApp(db: Db, initData: string) {
+  const tgUser = verifyTelegramWebAppInitData(initData);
+  const user = await getUserByTelegramId(db, tgUser.id);
+  if (!user) {
+    throw unauthorizedError(
+      "Tài khoản chưa kích hoạt — nhắn /start <mã mời> trong bot trước khi đăng nhập web.",
+    );
+  }
+  assertOwner(user);
+  const session = await createSession(db, user.id, "web", WEB_SESSION_TTL_MINUTES);
+  return {
+    token: session.token,
+    user: { id: user.id, name: user.name, role: user.role, employee_id: user.employeeId },
+    expires_at: session.expiresAt,
+  };
 }
 
 /** Tìm mã trong tin nhắn dán (VD copy cả block mời NV) */

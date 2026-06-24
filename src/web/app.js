@@ -800,11 +800,20 @@ function renderApp(user) {
   navigate("overview");
 }
 
+function getTelegramInitData() {
+  try {
+    // Telegram WebApp inject window.Telegram.WebApp.initData
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && tg.initData) return tg.initData;
+  } catch {}
+  return null;
+}
+
 async function boot() {
   const code = getCodeFromUrl();
   const savedToken = token();
 
-  // Phiên web đang hoạt động — ưu tiên, không đổi lại link (có thể đã hết 5 phút)
+  // 1. Phiên web đang hoạt động — ưu tiên luôn
   if (savedToken) {
     try {
       const user = await api("/auth/me");
@@ -816,6 +825,28 @@ async function boot() {
     }
   }
 
+  // 2. Mở qua Telegram WebApp — xác thực bằng initData (chữ ký Telegram, không lộ token)
+  const initData = getTelegramInitData();
+  if (initData) {
+    try {
+      const tg = window.Telegram.WebApp;
+      tg.ready && tg.ready();
+      const data = await api("/auth/telegram/webapp", {
+        method: "POST",
+        body: JSON.stringify({ init_data: initData }),
+      });
+      setToken(data.token);
+      renderApp(data.user);
+      return;
+    } catch (e) {
+      document.getElementById("login-err").textContent =
+        e.message || "Xác thực Telegram thất bại — thử lại từ bot /dashboard.";
+      document.getElementById("login-screen").classList.remove("hidden");
+      return;
+    }
+  }
+
+  // 3. Magic link (fallback — vẫn giữ để tương thích dev/localhost)
   if (code) {
     try {
       const data = await api("/auth/magic-link", { method: "POST", body: JSON.stringify({ code }) });
@@ -823,21 +854,22 @@ async function boot() {
       history.replaceState({}, "", "/dashboard");
       renderApp(data.user);
       return;
-    } catch (e) {
+    } catch {
       document.getElementById("login-err").textContent =
-        "Link đăng nhập hết hạn (5 phút) hoặc đã dùng — lấy link mới từ bot /dashboard.";
+        "Link đăng nhập hết hạn hoặc đã dùng — mở lại từ bot /dashboard.";
       document.getElementById("login-screen").classList.remove("hidden");
       return;
     }
   }
 
+  // 4. Chưa đăng nhập
   document.getElementById("login-screen").classList.remove("hidden");
   const initial = (AGENCY || "G").charAt(0).toUpperCase();
   const loginLogo = document.querySelector(".login-logo");
   if (loginLogo) loginLogo.textContent = initial;
   if (savedToken) {
     document.getElementById("login-err").textContent =
-      "Phiên web hết hạn (8 giờ) — lấy link mới từ bot /dashboard.";
+      "Phiên web hết hạn (8 giờ) — mở lại từ bot /dashboard.";
   }
 }
 
