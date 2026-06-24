@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{AGENCY_NAME}} — Mở Dashboard</title>
+  <style>
+    :root { --accent: #2563eb; --text: #111827; --muted: #6b7280; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: system-ui, sans-serif;
+      background: #f4f5f7; color: var(--text);
+      display: flex; align-items: center; justify-content: center; padding: 1.25rem;
+    }
+    .card {
+      background: #fff; border-radius: 14px; padding: 2rem 1.5rem;
+      max-width: 400px; width: 100%; text-align: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,.08);
+    }
+    .logo {
+      width: 52px; height: 52px; margin: 0 auto 1rem; border-radius: 12px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff;
+      font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
+    h1 { margin: 0 0 .5rem; font-size: 1.2rem; }
+    p { color: var(--muted); font-size: .9rem; line-height: 1.55; margin: .5rem 0; }
+    .btn {
+      display: block; width: 100%; margin-top: 1.25rem; padding: .85rem 1rem;
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none;
+    }
+    .btn-outline {
+      background: #fff; color: var(--accent); border: 1px solid var(--accent); margin-top: .65rem;
+    }
+    .hint { font-size: .8rem; margin-top: 1rem; padding: .75rem; background: #f9fafb; border-radius: 8px; text-align: left; }
+    .ok { color: #16a34a; font-weight: 600; margin-top: .75rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">{{INITIAL}}</div>
+    <h1>{{AGENCY_NAME}}</h1>
+    <p>Đang chuyển sang trình duyệt…</p>
+    <a id="open-btn" class="btn" href="#">Mở Dashboard</a>
+    <button id="copy-btn" class="btn btn-outline" type="button">Sao chép link</button>
+    <p id="copy-ok" class="ok">Đã sao chép — dán vào Safari/Chrome</p>
+    <div class="hint" id="hint-ios" style="display:none">
+      <strong>iPhone:</strong> Nếu vẫn ở trong Telegram → bấm <strong>⋯</strong> góc phải → <strong>Mở bằng Safari</strong>
+    </div>
+    <div class="hint" id="hint-android" style="display:none">
+      <strong>Android:</strong> Nếu không tự mở → bấm nút trên hoặc <strong>⋯ → Mở bằng trình duyệt</strong>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var code = params.get("code");
+      if (!code) {
+        document.querySelector("p").textContent = "Link không hợp lệ — lấy link mới từ bot /dashboard";
+        document.getElementById("open-btn").style.display = "none";
+        document.getElementById("copy-btn").style.display = "none";
+        return;
+      }
+      var dashUrl = location.origin + "/dashboard?code=" + encodeURIComponent(code);
+      var btn = document.getElementById("open-btn");
+      btn.href = dashUrl;
+
+      var ua = navigator.userAgent || "";
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      var isAndroid = /Android/i.test(ua);
+      if (isIOS) document.getElementById("hint-ios").style.display = "block";
+      if (isAndroid) document.getElementById("hint-android").style.display = "block";
+
+      function tryExternal(url) {
+        if (isAndroid) {
+          try {
+            var u = new URL(url);
+            var intent = "intent://" + u.host + u.pathname + u.search +
+              "#Intent;scheme=https;action=android.intent.action.VIEW;end";
+            location.href = intent;
+            return;
+          } catch (e) {}
+        }
+        window.location.href = url;
+      }
+
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        tryExternal(dashUrl);
+      });
+
+      document.getElementById("copy-btn").addEventListener("click", function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(dashUrl).then(function () {
+            document.getElementById("copy-ok").style.display = "block";
+          });
+        } else {
+          prompt("Sao chép link:", dashUrl);
+        }
+      });
+
+      setTimeout(function () { tryExternal(dashUrl); }, 400);
+    })();
+  </script>
+</body>
+</html>

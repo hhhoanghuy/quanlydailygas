@@ -111,7 +111,8 @@ export async function createMagicLink(db: Db, userId: string) {
   const baseUrl = getPublicBaseUrl();
   return {
     code,
-    url: `${baseUrl}/dashboard?code=${code}`,
+    url: `${baseUrl}/open?code=${code}`,
+    dashboardUrl: `${baseUrl}/dashboard?code=${code}`,
     expiresAt,
     expiresInMinutes: MAGIC_LINK_TTL_MINUTES,
   };

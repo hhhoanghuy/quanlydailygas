@@ -71,4 +71,14 @@ export async function registerDashboardWeb(app: FastifyInstance) {
       .type("text/html; charset=utf-8")
       .send(html.replaceAll("{{AGENCY_NAME}}", agency));
   });
+
+  app.get("/open", async (_req, reply) => {
+    if (isDev) cache.delete("open.html");
+    const html = await loadWebFile("open.html");
+    const agency = agencyName();
+    const initial = agency.charAt(0).toUpperCase() || "G";
+    return reply
+      .type("text/html; charset=utf-8")
+      .send(html.replaceAll("{{AGENCY_NAME}}", agency).replaceAll("{{INITIAL}}", initial));
+  });
 }

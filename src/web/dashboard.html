@@ -12,14 +12,15 @@
     <div class="login-box">
       <div class="login-logo">G</div>
       <h1>{{AGENCY_NAME}}</h1>
-      <p>Gõ <strong>/dashboard</strong> trong bot Telegram → bấm chữ <strong>Đăng nhập Dashboard</strong></p>
-      <p class="muted">Link dùng 1 lần, hết hạn 5 phút.<br />Sau khi vào, phiên làm việc giữ <strong>8 giờ</strong>.</p>
+      <p>Gõ <strong>/dashboard</strong> trong bot → bấm <strong>Đăng nhập Dashboard</strong></p>
+      <p class="muted">Mở trình duyệt ngoài (Safari/Chrome) · link 1 lần · 5 phút · phiên 8 giờ</p>
       <p id="login-err" class="error"></p>
     </div>
   </div>
 
   <div id="app-screen" class="app hidden">
-    <aside class="sidebar">
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden" aria-hidden="true"></div>
+    <aside class="sidebar" id="sidebar">
       <div class="brand-block">
         <div class="brand-logo" id="brand-initial">G</div>
         <div class="brand-name" id="brand-name">{{AGENCY_NAME}}</div>
@@ -66,7 +67,8 @@
 
     <div class="main">
       <header class="page-header">
-        <div>
+        <button type="button" class="btn-menu" id="btn-menu" aria-label="Mở menu">☰</button>
+        <div class="page-header-text">
           <h1 id="page-title">Tổng quan</h1>
           <p class="page-sub" id="page-sub"></p>
         </div>

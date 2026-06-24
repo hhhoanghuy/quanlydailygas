@@ -378,7 +378,33 @@ function panel(title, toolbarHtml, bodyHtml) {
 
 function table(headers, rows) {
   if (!rows.length) return '<p class="empty">Chưa có dữ liệu</p>';
-  return `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+
+  const parseCells = (tr) => {
+    const cells = [];
+    const re = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let m;
+    while ((m = re.exec(tr)) !== null) cells.push(m[1].trim());
+    return cells;
+  };
+
+  const desktop = `<div class="table-desktop"><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+
+  const cards = rows.map((tr) => {
+    const cells = parseCells(tr);
+    const orderId = (tr.match(/data-order="([^"]+)"/) || [])[1];
+    const dataOrder = orderId ? ` data-order="${orderId}"` : "";
+    const body = headers
+      .map((h, i) => {
+        if (cells[i] === undefined || cells[i] === "" || h === "") return "";
+        return `<div class="data-card-row"><span class="data-lbl">${h}</span><span class="data-val">${cells[i]}</span></div>`;
+      })
+      .filter(Boolean)
+      .join("");
+    const clickable = tr.includes("row-clickable") ? " data-card-clickable" : "";
+    return `<div class="data-card${clickable}"${dataOrder}>${body}</div>`;
+  }).join("");
+
+  return desktop + `<div class="table-mobile">${cards}</div>`;
 }
 
 /* ── Pages ── */
@@ -768,6 +794,7 @@ const PAGE_TITLES = {
 };
 
 function navigate(page) {
+  closeSidebar();
   document.querySelectorAll(".nav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.page === page);
   });
@@ -777,6 +804,18 @@ function navigate(page) {
   const content = document.getElementById("page-content");
   content.innerHTML = '<p class="empty">Đang tải…</p>';
   if (pages[page]) pages[page](content).catch((e) => { content.innerHTML = `<p class="error">${e.message}</p>`; });
+}
+
+function closeSidebar() {
+  document.getElementById("sidebar")?.classList.remove("open");
+  document.getElementById("sidebar-backdrop")?.classList.add("hidden");
+  document.body.classList.remove("nav-open");
+}
+
+function openSidebar() {
+  document.getElementById("sidebar")?.classList.add("open");
+  document.getElementById("sidebar-backdrop")?.classList.remove("hidden");
+  document.body.classList.add("nav-open");
 }
 
 function renderApp(user) {
@@ -789,6 +828,12 @@ function renderApp(user) {
   const loginLogo = document.querySelector(".login-logo");
   if (loginLogo) loginLogo.textContent = initial;
   injectIcons();
+  document.getElementById("btn-menu")?.addEventListener("click", () => {
+    const sb = document.getElementById("sidebar");
+    if (sb?.classList.contains("open")) closeSidebar();
+    else openSidebar();
+  });
+  document.getElementById("sidebar-backdrop")?.addEventListener("click", closeSidebar);
   document.querySelectorAll(".nav a").forEach((a) => {
     a.onclick = (e) => { e.preventDefault(); navigate(a.dataset.page); };
   });
