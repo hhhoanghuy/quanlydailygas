@@ -12,7 +12,7 @@ import {
   completeDeliveryOrder,
   createDeliveryOrder,
   getOrderDetail,
-  listActiveEmployees,
+  listDeliveryWorkers,
   listPendingOrders,
   markOrderDelivering,
 } from "../services/order.service.js";
@@ -292,7 +292,7 @@ async function showOrderConfirm(ctx: Context, draft: OrderDraft) {
     .text("➕ Thêm loại bình", "order_add_more")
     .text("❌ Huỷ", "order_cancel_draft");
   await ctx.reply(
-    `📋 Xác nhận đơn — ${draft.customerName}\n${lines}\n\nBước tiếp: chọn nhân viên giao.`,
+    `📋 Xác nhận đơn — ${draft.customerName}\n${lines}\n\nBấm ✅ để lên đơn — hệ thống tự gán người giao (hoặc chọn nếu có từ 2 người).`,
     { reply_markup: kb },
   );
 }
@@ -304,28 +304,22 @@ async function promptEmployeeOrSaveOrder(ctx: Context, db: Db, user: BotUser) {
     return;
   }
 
-  const employees = await listActiveEmployees(db);
+  const ownerEmployeeId = await ensureEmployeeId(db, user);
+  const workers = await listDeliveryWorkers(db, user, ownerEmployeeId);
 
-  if (employees.length === 0) {
-    await ctx.reply(
-      "⚠️ Chưa có nhân viên — tạo mã mời NV trong ⚙️ Cài đặt trước khi lên đơn.",
-      { reply_markup: mainMenu(user.role) },
-    );
-    return;
-  }
-
-  if (employees.length === 1) {
-    await finalizeOwnerOrder(ctx, db, user, employees[0].employeeId);
+  if (workers.length === 1) {
+    await finalizeOwnerOrder(ctx, db, user, workers[0].employeeId);
     return;
   }
 
   const kb = new InlineKeyboard();
-  for (const emp of employees) {
-    kb.text(`👷 ${emp.name}`, `order_assign_emp:${emp.employeeId}`).row();
+  for (const w of workers) {
+    const label = w.isOwner ? `👑 ${w.name} (chủ)` : `👷 ${w.name}`;
+    kb.text(label, `order_assign_emp:${w.employeeId}`).row();
   }
   kb.text("❌ Huỷ", "order_cancel_draft");
   await ctx.reply(
-    `👷 Chọn nhân viên giao — ${session.orderDraft.customerName}\n\nChỉ NV được chọn mới nhận thông báo đơn này.`,
+    `👷 Chọn người giao — ${session.orderDraft.customerName}\n\nChỉ người được chọn nhận thông báo đơn trên Telegram.`,
     { reply_markup: kb },
   );
 }
@@ -358,12 +352,15 @@ async function finalizeOwnerOrder(
     clearSession(ctx.from!.id);
 
     const summary = draft.lines.map((l) => `${l.cylinderName} ×${l.cylindersOut}`).join(", ");
+    const ownerEmployeeId = await ensureEmployeeId(db, user);
     const assignee =
       assignedEmployeeId &&
-      (await listActiveEmployees(db)).find((e) => e.employeeId === assignedEmployeeId)?.name;
+      (await listDeliveryWorkers(db, user, ownerEmployeeId)).find(
+        (w) => w.employeeId === assignedEmployeeId,
+      )?.name;
 
     await ctx.reply(
-      `✅ Đã lên đơn thành công!\n\n👤 ${draft.customerName}\n🛢 ${summary}\n👷 NV giao: ${assignee ?? "?"}`,
+      `✅ Đã lên đơn thành công!\n\n👤 ${draft.customerName}\n🛢 ${summary}\n👷 Người giao: ${assignee ?? "?"}`,
       { reply_markup: mainMenu(user.role) },
     );
   } catch (err) {
@@ -399,7 +396,7 @@ async function showOrdersList(ctx: Context, db: Db, user: BotUser) {
         `📌 ${orderStatusText(o.status)}`,
       ];
       if (user.role === "owner") {
-        lines.push(`👷 ${o.assignedEmployeeName ?? "chưa gán NV"}`);
+        lines.push(`👷 ${o.assignedEmployeeName ?? "chưa gán người giao"}`);
       }
       return lines.join("\n");
     })
@@ -427,10 +424,11 @@ async function showOrderDetail(
     .join("\n");
 
   const kb = new InlineKeyboard();
+  const assigneeId = user.employeeId ?? (user.role === "owner" ? await ensureEmployeeId(db, user) : null);
   const canFulfill =
-    user.role === "employee" &&
+    Boolean(assigneeId) &&
     (order.status === "pending" || order.status === "delivering") &&
-    (!order.assignedEmployeeId || order.assignedEmployeeId === user.employeeId);
+    order.assignedEmployeeId === assigneeId;
 
   if (canFulfill) {
     kb.text("🚚 Giao hàng", `order_fulfill:${order.id}`).row();
@@ -441,8 +439,8 @@ async function showOrderDetail(
   kb.text("◀️ Danh sách", "orders_list").text("📋 Menu", "menu");
 
   const assigneeLine = order.assignedEmployeeName
-    ? `👷 NV giao: ${order.assignedEmployeeName}\n`
-    : "⚠️ Chưa gán NV — chủ cần huỷ và lên đơn lại\n";
+    ? `👷 Người giao: ${order.assignedEmployeeName}\n`
+    : "⚠️ Chưa gán người giao — chủ cần huỷ và lên đơn lại\n";
 
   await ctx.reply(
     `📦 Đơn hàng\n\n👤 ${order.customerName}\n📞 ${order.customerPhone}\n📍 ${order.customerAddress}\n${assigneeLine}\n${lineText}\n\nTrạng thái: ${orderStatusText(order.status)}`,

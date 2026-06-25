@@ -33,16 +33,16 @@ export async function notifyEmployeesNewOrder(
 
   const employees = await listEmployeeTelegramIds(db, order.assignedEmployeeId);
   if (!employees.length) {
-    console.warn("No employees to notify for order", orderId);
+    console.warn("No assignee with Telegram to notify for order", orderId);
     return;
   }
 
   await Promise.allSettled(
-    employees.map((emp) =>
+    employees.map((target) =>
       api
-        .sendMessage(emp.telegramUserId, text, { reply_markup: kb })
+        .sendMessage(target.telegramUserId, text, { reply_markup: kb })
         .catch((err) => {
-          console.error(`Notify ${emp.name} failed:`, err);
+          console.error(`Notify ${target.name} failed:`, err);
         }),
     ),
   );

@@ -8,7 +8,9 @@ import {
   getOrderDetail,
   listOrders,
   getOrderDetailForWeb,
+  listDeliveryWorkers,
 } from "../../src/services/order.service.js";
+import { ensureEmployeeId } from "../../src/services/auth.service.js";
 import {
   hasDb,
   createTestCustomer,
@@ -112,6 +114,39 @@ describe.skipIf(!hasDb)("order flow (integration)", () => {
         lines: [{ cylinderTypeId: cyl.id, cylindersOut: 1 }],
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("owner-only shop: assign and complete as owner", async () => {
+    const customer = await createTestCustomer(db);
+    const owner = await createTestOwnerUser(db);
+    const cyl = await getTestCylinderType(db);
+    customerId = customer.id;
+    ownerUserId = owner.id;
+
+    const ownerEmployeeId = await ensureEmployeeId(db, owner);
+    const workers = await listDeliveryWorkers(db, owner, ownerEmployeeId);
+    expect(workers).toHaveLength(1);
+    expect(workers[0].isOwner).toBe(true);
+
+    const { order } = await createDeliveryOrder(db, {
+      customerId,
+      createdByUserId: owner.id,
+      assignedEmployeeId: ownerEmployeeId,
+      lines: [{ cylinderTypeId: cyl.id, cylindersOut: 1 }],
+    });
+    orderId = order.id;
+
+    await markOrderDelivering(db, order.id, ownerEmployeeId);
+    await completeDeliveryOrder(db, {
+      orderId: order.id,
+      employeeId: ownerEmployeeId,
+      cylindersInByLine: [0],
+      cashReceived: 0,
+      note: "payment=no",
+    });
+
+    const done = await getOrderDetail(db, order.id);
+    expect(done.order.status).toBe("completed");
   });
 
   it("validation: cannot complete twice", async () => {

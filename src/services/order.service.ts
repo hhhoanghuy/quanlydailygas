@@ -577,20 +577,51 @@ export async function listActiveEmployees(db: Db) {
     .orderBy(users.name);
 }
 
-export async function listEmployeeTelegramIds(db: Db, employeeId?: string) {
-  const conditions = [eq(users.role, "employee")];
-  if (employeeId) {
-    conditions.push(eq(users.employeeId, employeeId));
-  }
+export type DeliveryWorker = {
+  employeeId: string;
+  name: string;
+  isOwner: boolean;
+  telegramUserId: number | null;
+};
 
-  return db
+/** Chủ đại lý + NV đang hoạt động — ai có thể nhận đơn giao. */
+export async function listDeliveryWorkers(
+  db: Db,
+  owner: { name: string; telegramUserId: number | null },
+  ownerEmployeeId: string,
+): Promise<DeliveryWorker[]> {
+  const workers: DeliveryWorker[] = [
+    {
+      employeeId: ownerEmployeeId,
+      name: owner.name,
+      isOwner: true,
+      telegramUserId: owner.telegramUserId,
+    },
+  ];
+  const employees = await listActiveEmployees(db);
+  for (const emp of employees) {
+    workers.push({
+      employeeId: emp.employeeId,
+      name: emp.name,
+      isOwner: false,
+      telegramUserId: emp.telegramUserId,
+    });
+  }
+  return workers;
+}
+
+export async function listEmployeeTelegramIds(db: Db, employeeId: string) {
+  const rows = await db
     .select({
       telegramUserId: users.telegramUserId,
       name: users.name,
-      employeeId: users.employeeId,
     })
     .from(users)
-    .where(and(...conditions));
+    .where(eq(users.employeeId, employeeId));
+
+  return rows.filter(
+    (r): r is { telegramUserId: number; name: string } => r.telegramUserId != null,
+  );
 }
 
 export function formatOrderNotification(
