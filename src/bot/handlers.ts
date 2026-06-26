@@ -24,6 +24,11 @@ import { adminMenu, backMenu, employeeMenu, mainMenu } from "./keyboards.js";
 import { replyMenuForUser, sendHelp } from "./menu-commands.js";
 import { AppError, forbiddenError } from "../../utils/errors.js";
 import {
+  CUSTOMER_INPUT_EXAMPLE,
+  CUSTOMER_INPUT_FORMAT,
+  parseCustomerInput,
+} from "../../utils/customer-input.js";
+import {
   customerPickButtonLabel,
   formatCustomerSearchLine,
 } from "../../utils/customer-display.js";
@@ -174,7 +179,7 @@ async function handleCallback(
     requireOwner(user);
     setSession(ctx.from!.id, { step: "customer_add" });
     await ctx.reply(
-      "➕ Thêm khách mới\nGửi theo format:\n`Tên | SĐT | Địa chỉ`\n\nVD: `Phở Hoa | 0901234567 | 123 Lê Lợi`",
+      `➕ Thêm khách mới\nGửi theo format:\n\`${CUSTOMER_INPUT_FORMAT}\`\n\nVD: \`${CUSTOMER_INPUT_EXAMPLE}\``,
       { parse_mode: "Markdown", reply_markup: cancelCustomerMenu() },
     );
     return;
@@ -261,7 +266,7 @@ async function handleText(
   if (step === "customer_add" || step === "customer_confirm") {
     requireOwner(user);
     await ctx.reply(
-      "❌ Sai format.\nGửi đúng: `Tên | SĐT | Địa chỉ`\nVD: `Phở Hoa | 0901234567 | 123 Lê Lợi`",
+      `❌ Sai format.\nGửi đúng: \`${CUSTOMER_INPUT_FORMAT}\`\nVD: \`${CUSTOMER_INPUT_EXAMPLE}\``,
       { parse_mode: "Markdown", reply_markup: cancelCustomerMenu() },
     );
     return true;
@@ -292,7 +297,7 @@ async function replyError(ctx: Context, err: unknown) {
 async function replyUnknownInput(ctx: Context, user: BotUser, step: string) {
   const hints: Record<string, string> = {
     idle: "Bấm /menu để mở menu hoặc chọn nút bên dưới.",
-    customer_add: "Gửi: Tên | SĐT | Địa chỉ",
+    customer_add: `Gửi: ${CUSTOMER_INPUT_FORMAT}`,
     customer_confirm: "Bấm ✅ Lưu để xác nhận hoặc gửi lại thông tin khách.",
     customer_search: "Gõ tên, SĐT hoặc địa chỉ khách để tìm.",
     debt_phone: "Nhập tên, SĐT hoặc địa chỉ khách để tra nợ.",
@@ -304,7 +309,7 @@ async function replyUnknownInput(ctx: Context, user: BotUser, step: string) {
       "Nhập: <vỏ thu> <tiền>vnd <tm|ck|no>. Dùng dấu cách hoặc -. VD ghi nợ: 4 3 0vnd no",
     team_edit: "Gửi: Tên | SĐT",
     team_assign_order: "Nhập mã đơn (8 ký tự đầu).",
-    customer_edit: "Gửi: Tên | SĐT | Địa chỉ",
+    customer_edit: `Gửi: ${CUSTOMER_INPUT_FORMAT}`,
   };
   await ctx.reply(`⚠️ ${hints[step] ?? "Bấm /menu để quay lại"}`, {
     reply_markup: mainMenu(user.role),
@@ -330,25 +335,11 @@ function looksLikeCustomerAdd(text: string): boolean {
   return draft !== null;
 }
 
-function parseCustomerInput(text: string): CustomerDraft | null {
-  if (!text.includes("|")) return null;
-  const parts = text.split("|").map((s) => s.trim());
-  if (parts.length < 3 || !parts[0] || !parts[1] || !parts[2]) return null;
-  const digits = parts[1].replace(/\D/g, "");
-  if (digits.length < 9) return null;
-  return {
-    name: parts[0],
-    phone: parts[1],
-    address: parts[2],
-    customerType: parseCustomerType(parts[3]),
-  };
-}
-
 async function showCustomerConfirm(ctx: Context, telegramId: number, text: string) {
   const draft = parseCustomerInput(text);
   if (!draft) {
     await ctx.reply(
-      "❌ Sai format.\nGửi: `Tên | SĐT | Địa chỉ`\nVD: `Phở Hoa | 0901234567 | 123 Lê Lợi`",
+      `❌ Sai format.\nGửi: \`${CUSTOMER_INPUT_FORMAT}\`\nVD: \`${CUSTOMER_INPUT_EXAMPLE}\``,
       { parse_mode: "Markdown", reply_markup: cancelCustomerMenu() },
     );
     return;
@@ -359,17 +350,6 @@ async function showCustomerConfirm(ctx: Context, telegramId: number, text: strin
     `📋 Xác nhận thêm khách?\n\n👤 ${draft.name}\n📞 ${draft.phone}\n📍 ${draft.address}`,
     { reply_markup: customerConfirmMenu() },
   );
-}
-
-function parseCustomerType(raw?: string): "household" | "restaurant" | "industrial" | undefined {
-  if (!raw) return undefined;
-  const t = raw.toLowerCase();
-  if (t.includes("quán") || t.includes("quan")) return "restaurant";
-  if (t.includes("cn") || t.includes("công nghiệp") || t.includes("cong nghiep")) {
-    return "industrial";
-  }
-  if (t.includes("nhà") || t.includes("nha")) return "household";
-  return undefined;
 }
 
 async function replyCustomerDetail(

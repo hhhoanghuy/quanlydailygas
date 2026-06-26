@@ -13,6 +13,10 @@ import {
   formatCustomerSearchLine,
 } from "../../utils/customer-display.js";
 import { AppError } from "../../utils/errors.js";
+import {
+  CUSTOMER_INPUT_FORMAT,
+  parseCustomerInput,
+} from "../../utils/customer-input.js";
 
 type BotUser = typeof users.$inferSelect;
 
@@ -96,8 +100,8 @@ export async function handleCustomerFlowCallback(
       [
         `✏️ Cập nhật — ${customer.name}`,
         "",
-        "Gửi: Tên | SĐT | Địa chỉ",
-        `VD: ${customer.name} | ${customer.phone} | ${customer.address}`,
+        `Gửi: ${CUSTOMER_INPUT_FORMAT}`,
+        `VD: ${customer.name} - ${customer.phone} - ${customer.address}`,
       ].join("\n"),
       { reply_markup: new InlineKeyboard().text("❌ Huỷ", `customer_view:${customerId}`) },
     );
@@ -151,20 +155,20 @@ export async function handleCustomerFlowText(
   }
 
   if (step === "customer_edit" && session.customerEditDraft) {
-    const parts = text.split("|").map((s) => s.trim());
-    if (parts.length < 3 || !parts[0] || !parts[1] || !parts[2]) {
-      await ctx.reply("❌ Sai format. Gửi: Tên | SĐT | Địa chỉ");
+    const parsed = parseCustomerInput(text);
+    if (!parsed) {
+      await ctx.reply(`❌ Sai format. Gửi: ${CUSTOMER_INPUT_FORMAT}`);
       return true;
     }
     try {
       const id = session.customerEditDraft.customerId;
       await updateCustomer(db, id, {
-        name: parts[0],
-        phone: parts[1],
-        address: parts[2],
+        name: parsed.name,
+        phone: parsed.phone,
+        address: parsed.address,
       });
       clearSession(telegramId);
-      await ctx.reply(`✅ Đã cập nhật khách: ${parts[0]}`, {
+      await ctx.reply(`✅ Đã cập nhật khách: ${parsed.name}`, {
         reply_markup: new InlineKeyboard().text("◀️ Chi tiết", `customer_view:${id}`),
       });
     } catch (err) {
