@@ -15,7 +15,8 @@ import { clearSession, getSession, setSession, type CustomerDraft } from "./sess
 import { tryActivateFromText } from "./activation.js";
 import { handleOrderCallback, handleOrderText } from "./order-flow.js";
 import { handleSettingsCallback, handleSettingsText } from "./settings-flow.js";
-import { mainMenu, backMenu, statsMenu } from "./keyboards.js";
+import { adminMenu, backMenu, employeeMenu, mainMenu, statsMenu } from "./keyboards.js";
+import { replyMenuForUser } from "./menu-commands.js";
 import { sendDashboardLink } from "./dashboard-link.js";
 import { AppError, forbiddenError } from "../../utils/errors.js";
 import { orderStatusText } from "../../utils/order-status.js";
@@ -91,23 +92,58 @@ async function handleCallback(
 
   if (data === "menu") {
     clearSession(ctx.from!.id);
-    await ctx.reply("📋 Menu", { reply_markup: mainMenu(user.role) });
+    await replyMenuForUser(ctx, user);
+    return;
+  }
+
+  if (data === "team_menu") {
+    requireOwner(user);
+    await ctx.reply(
+      [
+        "👷 Quản lý nhân sự",
+        "",
+        "Đang triển khai (P3): danh sách NV, cập nhật, giao việc theo mã đơn.",
+        "Tạm thời tạo mã mời NV: ⚙️ Cài đặt → 🔗 Mã mời NV",
+        "Hoặc web dashboard → Đội ngũ",
+      ].join("\n"),
+      { reply_markup: backMenu() },
+    );
+    return;
+  }
+
+  if (data === "claim_orders") {
+    if (user.role !== "employee") {
+      await ctx.reply("❌ Chỉ nhân viên mới nhận đơn.", { reply_markup: adminMenu() });
+      return;
+    }
+    await ctx.reply(
+      [
+        "📥 Nhận đơn",
+        "",
+        "Chỉ đơn chưa gán người giao — đang triển khai (P2).",
+        "Hiện tại xem đơn đã gán cho bạn: 📋 Xem đơn.",
+      ].join("\n"),
+      { reply_markup: employeeMenu() },
+    );
     return;
   }
 
   if (data === "debt_check") {
     setSession(ctx.from!.id, { step: "debt_phone" });
-    await ctx.reply("💰 Tra nợ\nNhập tên, SĐT hoặc địa chỉ khách:");
+    const title = user.role === "employee" ? "💰 Kiểm tra công nợ" : "💰 Tra nợ";
+    await ctx.reply(`${title}\nNhập tên, SĐT hoặc địa chỉ khách:`);
     return;
   }
 
   if (data === "payment_collect") {
+    requireOwner(user);
     setSession(ctx.from!.id, { step: "payment_search" });
     await ctx.reply("💵 Thu nợ\nNhập tên, SĐT hoặc địa chỉ khách:");
     return;
   }
 
   if (data.startsWith("payment_pick:")) {
+    requireOwner(user);
     const customerId = data.slice("payment_pick:".length);
     clearSession(ctx.from!.id);
     await startPaymentFlow(ctx, db, ctx.from!.id, customerId);
@@ -304,11 +340,13 @@ async function handleText(
   }
 
   if (step === "payment_search") {
+    requireOwner(user);
     await processPaymentSearch(ctx, db, telegramId, text);
     return true;
   }
 
   if (step === "payment_input") {
+    requireOwner(user);
     await processPaymentInput(ctx, db, telegramId, text, user);
     return true;
   }
@@ -370,7 +408,7 @@ async function replyUnknownInput(ctx: Context, user: BotUser, step: string) {
   });
 }
 
-export { mainMenu, statsMenu } from "./keyboards.js";
+export { mainMenu, statsMenu, adminMenu, employeeMenu } from "./keyboards.js";
 
 function customersMenu() {
   return new InlineKeyboard()
@@ -449,10 +487,11 @@ async function replyDebtCard(
   const kb = new InlineKeyboard();
   if (user.role === "owner") {
     kb.text("📞 Lên đơn", `order_for_customer:${customerId}`).row();
+    kb.text("💵 Thu nợ", `payment_pick:${customerId}`).row();
   } else {
-    kb.text("📋 Đơn cần giao", "orders_list").row();
+    kb.text("📋 Xem đơn", "orders_list").row();
   }
-  kb.text("💵 Thu nợ", `payment_pick:${customerId}`).row().text("◀️ Menu", "menu");
+  kb.text("◀️ Menu", "menu");
   await ctx.reply(
     [
       `💰 ${customer.name}`,

@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:reset": "tsx scripts/reset-db.ts",
     "db:sync-types": "tsx src/db/sync-cylinder-types.ts",
     "db:invite": "tsx scripts/list-invite.ts"
   },

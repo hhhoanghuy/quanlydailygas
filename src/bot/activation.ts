@@ -14,16 +14,19 @@ export async function handleStartCommand(ctx: Context, db: Db) {
   const existing = await getUserByTelegramId(db, from.id);
 
   if (existing) {
-      const { mainMenu } = await import("./keyboards.js");
     const roleLabel = existing.role === "owner" ? "Chủ đại lý" : "Nhân viên";
+    const menuHint =
+      existing.role === "owner"
+        ? "Gõ /menu_admin hoặc /menu"
+        : "Gõ /nhan_vien hoặc /menu";
     if (!payload) {
-      await ctx.reply(`Xin chào ${existing.name}! (${roleLabel})`, {
-        reply_markup: mainMenu(existing.role),
+      await ctx.reply(`Xin chào ${existing.name}! (${roleLabel})\n${menuHint}`, {
+        reply_markup: (await import("./keyboards.js")).mainMenu(existing.role),
       });
       return;
     }
-    await ctx.reply(`Bạn đã kích hoạt (${roleLabel}). Gõ /menu để tiếp tục.`, {
-      reply_markup: mainMenu(existing.role),
+    await ctx.reply(`Bạn đã kích hoạt (${roleLabel}). ${menuHint}`, {
+      reply_markup: (await import("./keyboards.js")).mainMenu(existing.role),
     });
     return;
   }
@@ -62,8 +65,12 @@ async function activateFromCode(ctx: Context, db: Db, rawCode: string) {
     });
       const { mainMenu } = await import("./keyboards.js");
     const roleLabel = result.user.role === "owner" ? "Chủ đại lý" : "Nhân viên";
+    const menuHint =
+      result.user.role === "owner"
+        ? "Gõ /menu_admin hoặc /help"
+        : "Gõ /nhan_vien hoặc /help";
     await ctx.reply(
-      `✅ Kích hoạt thành công!\nVai trò: ${roleLabel}\n\nGõ /menu để mở menu.`,
+      `✅ Kích hoạt thành công!\nVai trò: ${roleLabel}\n\n${menuHint}`,
       { reply_markup: mainMenu(result.user.role) },
     );
   } catch (err) {

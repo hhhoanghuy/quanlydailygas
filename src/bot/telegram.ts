@@ -1,12 +1,20 @@
 import { Bot, webhookCallback } from "grammy";
 import type { FastifyInstance } from "fastify";
 
-import { getUserByTelegramId } from "../services/auth.service.js";
 import { getWebhookUrl } from "../config/env.js";
 import { handleStartCommand } from "./activation.js";
-import { sendDashboardLink } from "./dashboard-link.js";
 import { registerBotHandlers } from "./handlers.js";
-import { mainMenu } from "./keyboards.js";
+import {
+  buildHelpText,
+  getActivatedUser,
+  NOT_ACTIVATED,
+  replyAdminMenu,
+  replyEmployeeMenu,
+  replyMenuForUser,
+  sendHelp,
+  sendWebLogin,
+  SUPER_ADMIN_PLACEHOLDER,
+} from "./menu-commands.js";
 
 export async function registerBot(app: FastifyInstance) {
   const token = process.env.TELEGRAM_BOT_TOKEN!;
@@ -17,25 +25,73 @@ export async function registerBot(app: FastifyInstance) {
   });
 
   bot.command("menu", async (ctx) => {
-    const user = await getUserByTelegramId(app.db, ctx.from!.id);
+    const user = await getActivatedUser(app.db, ctx.from!.id);
     if (!user) {
-      await ctx.reply("Chưa kích hoạt — bấm link mã mời hoặc /start <mã>");
+      await ctx.reply(NOT_ACTIVATED);
       return;
     }
-    await ctx.reply("📋 Menu", { reply_markup: mainMenu(user.role) });
+    await replyMenuForUser(ctx, user);
   });
 
-  bot.command("dashboard", async (ctx) => {
-    const user = await getUserByTelegramId(app.db, ctx.from!.id);
+  bot.command("menu_admin", async (ctx) => {
+    const user = await getActivatedUser(app.db, ctx.from!.id);
     if (!user) {
-      await ctx.reply("Chưa kích hoạt — bấm link mã mời hoặc /start <mã>");
+      await ctx.reply(NOT_ACTIVATED);
+      return;
+    }
+    if (user.role !== "owner") {
+      await ctx.reply("❌ Chỉ chủ đại lý.\nNhân viên gõ: /nhan_vien");
+      return;
+    }
+    await replyAdminMenu(ctx);
+  });
+
+  bot.command("nhan_vien", async (ctx) => {
+    const user = await getActivatedUser(app.db, ctx.from!.id);
+    if (!user) {
+      await ctx.reply(NOT_ACTIVATED);
+      return;
+    }
+    if (user.role !== "employee") {
+      await ctx.reply("❌ Chỉ nhân viên.\nChủ đại lý gõ: /menu_admin");
+      return;
+    }
+    await replyEmployeeMenu(ctx);
+  });
+
+  bot.command("menu_super_admin", async (ctx) => {
+    await ctx.reply(SUPER_ADMIN_PLACEHOLDER);
+  });
+
+  bot.command("help", async (ctx) => {
+    const user = await getActivatedUser(app.db, ctx.from!.id);
+    await sendHelp(ctx, user?.role);
+  });
+
+  bot.command("weblogin", async (ctx) => {
+    const user = await getActivatedUser(app.db, ctx.from!.id);
+    if (!user) {
+      await ctx.reply(NOT_ACTIVATED);
       return;
     }
     if (user.role !== "owner") {
       await ctx.reply("❌ Chỉ chủ đại lý mới mở được Dashboard web.");
       return;
     }
-    await sendDashboardLink(ctx, app.db, user);
+    await sendWebLogin(ctx, app.db, user);
+  });
+
+  bot.command("dashboard", async (ctx) => {
+    const user = await getActivatedUser(app.db, ctx.from!.id);
+    if (!user) {
+      await ctx.reply(NOT_ACTIVATED);
+      return;
+    }
+    if (user.role !== "owner") {
+      await ctx.reply("❌ Chỉ chủ đại lý mới mở được Dashboard web.");
+      return;
+    }
+    await sendWebLogin(ctx, app.db, user);
   });
 
   bot.command("no", async (ctx) => {
@@ -131,3 +187,5 @@ declare module "fastify" {
     bot?: Bot;
   }
 }
+
+export { buildHelpText };

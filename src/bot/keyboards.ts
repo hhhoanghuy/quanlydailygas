@@ -1,23 +1,31 @@
 import { InlineKeyboard } from "grammy";
 
-export function mainMenu(role: string) {
-  if (role === "employee") {
-    return new InlineKeyboard()
-      .text("📋 Đơn cần giao", "orders_list")
-      .text("💰 Tra nợ", "debt_check")
-      .row()
-      .text("💵 Thu nợ", "payment_collect");
-  }
+/** Menu chủ đại lý — `/menu_admin` */
+export function adminMenu() {
   return new InlineKeyboard()
-    .text("📞 Lên đơn", "order_new")
-    .text("👤 Khách", "customers")
+    .text("👷 Đội ngũ", "team_menu")
+    .text("👤 Khách hàng", "customers")
+    .row()
+    .text("📊 Thống kê", "stats")
+    .text("⚙️ Cài đặt", "settings")
     .row()
     .text("📋 Đơn mở", "orders_list")
     .text("💵 Thu nợ", "payment_collect")
     .row()
-    .text("📊 Thống kê", "stats")
+    .text("📞 Lên đơn", "order_new");
+}
+
+/** Menu nhân viên — `/nhan_vien` */
+export function employeeMenu() {
+  return new InlineKeyboard()
+    .text("📋 Xem đơn", "orders_list")
+    .text("📥 Nhận đơn", "claim_orders")
     .row()
-    .text("⚙️ Cài đặt", "settings");
+    .text("💰 Kiểm tra công nợ", "debt_check");
+}
+
+export function mainMenu(role: string) {
+  return role === "employee" ? employeeMenu() : adminMenu();
 }
 
 export function statsMenu() {
