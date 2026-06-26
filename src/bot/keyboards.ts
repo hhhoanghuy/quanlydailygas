@@ -1,6 +1,6 @@
 import { InlineKeyboard } from "grammy";
 
-/** Menu chủ đại lý — `/menu_admin` (khớp roadmap) */
+/** Menu chủ đại lý — `/menu_admin` */
 export function adminMenu() {
   return new InlineKeyboard()
     .text("👷 Đội ngũ", "team_menu")
@@ -27,12 +27,15 @@ export function mainMenu(role: string) {
   return role === "employee" ? employeeMenu() : adminMenu();
 }
 
-export function statsMenu() {
+/** Nút drill-down dưới màn Tổng quan Thống kê */
+export function statsDrilldownMenu() {
   return new InlineKeyboard()
-    .text("📅 Theo ngày", "stats_day")
     .text("👷 Theo NV", "stats_employees")
+    .text("👤 Theo khách", "stats_customers")
     .row()
-    .text("📋 Đơn hàng", "stats_orders")
+    .text("📅 Theo tháng", "stats_month")
+    .text("📆 Theo tuần", "stats_week")
+    .row()
     .text("🌐 Đăng nhập web", "stats_web")
     .row()
     .text("◀️ Menu", "menu");
@@ -44,16 +47,6 @@ export function statsOrdersMenu() {
     .row()
     .text("◀️ Thống kê", "stats")
     .text("📋 Menu", "menu");
-}
-
-export function customersMenu() {
-  return new InlineKeyboard()
-    .text("🏆 Top 10 khách", "customers_top10")
-    .text("🔍 Tìm khách", "customer_search")
-    .row()
-    .text("➕ Thêm khách", "customer_add")
-    .row()
-    .text("◀️ Menu", "menu");
 }
 
 export function backMenu() {

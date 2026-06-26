@@ -13,7 +13,10 @@ export type SessionStep =
   | "delivery_line"
   | "delivery_cash"
   | "payment_search"
-  | "payment_input";
+  | "payment_input"
+  | "team_edit"
+  | "team_assign_order"
+  | "customer_edit";
 
 export interface CustomerDraft {
   name: string;
@@ -84,6 +87,24 @@ export interface PaymentDraft {
   customerName: string;
 }
 
+export interface TeamEditDraft {
+  employeeId: string;
+  name: string;
+  phone: string;
+}
+
+export interface TeamAssignDraft {
+  employeeId: string;
+  employeeName: string;
+}
+
+export interface CustomerEditDraft {
+  customerId: string;
+  name: string;
+  phone: string;
+  address: string;
+}
+
 export interface ChatSession {
   step: SessionStep;
   delivery?: DeliveryDraft;
@@ -92,6 +113,9 @@ export interface ChatSession {
   fulfillDraft?: FulfillDraft;
   priceEditDraft?: PriceEditDraft;
   paymentDraft?: PaymentDraft;
+  teamEditDraft?: TeamEditDraft;
+  teamAssignDraft?: TeamAssignDraft;
+  customerEditDraft?: CustomerEditDraft;
 }
 
 const sessions = new Map<number, ChatSession>();

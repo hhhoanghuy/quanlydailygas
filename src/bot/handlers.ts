@@ -7,28 +7,22 @@ import {
   createCustomer,
   getCustomerDetail,
   searchCustomerDebt,
-  searchCustomers,
-  listTopCustomersByCompletedOrders,
 } from "../services/customer.service.js";
-import { getStatsByDay, getStatsByEmployee, getStatsOrders } from "../services/stats.service.js";
 import { createPayment } from "../services/payment.service.js";
 import { clearSession, getSession, setSession, type CustomerDraft } from "./session.js";
 import { tryActivateFromText } from "./activation.js";
 import { handleOrderCallback, handleOrderText } from "./order-flow.js";
 import { handleSettingsCallback, handleSettingsText } from "./settings-flow.js";
+import { handleTeamCallback, handleTeamText } from "./team-flow.js";
 import {
-  adminMenu,
-  backMenu,
-  customersMenu,
-  employeeMenu,
-  mainMenu,
-  statsMenu,
-  statsOrdersMenu,
-} from "./keyboards.js";
+  handleCustomerFlowCallback,
+  handleCustomerFlowText,
+  showCustomersHub,
+} from "./customer-flow.js";
+import { handleStatsFlowCallback } from "./stats-flow.js";
+import { adminMenu, backMenu, employeeMenu, mainMenu } from "./keyboards.js";
 import { replyMenuForUser, sendHelp } from "./menu-commands.js";
-import { sendDashboardLink } from "./dashboard-link.js";
 import { AppError, forbiddenError } from "../../utils/errors.js";
-import { orderStatusText } from "../../utils/order-status.js";
 import {
   customerPickButtonLabel,
   formatCustomerSearchLine,
@@ -54,6 +48,11 @@ export function registerBotHandlers(bot: Bot, db: Db) {
   try {
     if (await handleOrderCallback(ctx, db, user, data)) return;
     if (await handleSettingsCallback(ctx, db, user, data)) return;
+    if (user.role === "owner") {
+      if (await handleTeamCallback(ctx, db, user, data)) return;
+      if (await handleCustomerFlowCallback(ctx, db, user, data)) return;
+      if (await handleStatsFlowCallback(ctx, db, user, data)) return;
+    }
     await handleCallback(ctx, db, user, data);
     } catch (err) {
       await replyError(ctx, err);
@@ -107,21 +106,6 @@ async function handleCallback(
 
   if (data === "help_menu") {
     await sendHelp(ctx, user.role);
-    return;
-  }
-
-  if (data === "team_menu") {
-    requireOwner(user);
-    await ctx.reply(
-      [
-        "👷 Quản lý nhân sự",
-        "",
-        "Đang triển khai (P3): danh sách NV, cập nhật, giao việc theo mã đơn.",
-        "Tạm thời tạo mã mời NV: ⚙️ Cài đặt → 🔗 Mã mời NV",
-        "Hoặc web dashboard → Đội ngũ",
-      ].join("\n"),
-      { reply_markup: backMenu() },
-    );
     return;
   }
 
@@ -182,132 +166,7 @@ async function handleCallback(
 
   if (data === "search") {
     requireOwner(user);
-    await ctx.reply("👤 Khách hàng — chọn thao tác:", { reply_markup: customersMenu() });
-    return;
-  }
-
-  if (data === "stats") {
-    requireOwner(user);
-    await ctx.reply("📊 Thống kê — chọn loại:", { reply_markup: statsMenu() });
-    return;
-  }
-
-  if (data === "stats_day") {
-    requireOwner(user);
-    const s = await getStatsByDay(db, new Date());
-    const cyl = s.cylinders.length
-      ? s.cylinders.map((c) => `· ${c.typeName}: giao ${c.cylindersOut} thu ${c.cylindersIn}`).join("\n")
-      : "· Chưa có giao hàng";
-    await ctx.reply(
-      [
-        `📅 ${s.date}`,
-        `📦 Số đơn giao: ${s.orderCount}`,
-        `💵 TM: ${s.cashRevenue.toLocaleString("vi-VN")}đ`,
-        `🏦 CK: ${s.transferRevenue.toLocaleString("vi-VN")}đ`,
-        `📒 Nợ thêm: ${s.debtAdded.toLocaleString("vi-VN")}đ`,
-        "",
-        "🛢 Theo loại bình:",
-        cyl,
-      ].join("\n"),
-      { reply_markup: statsMenu() },
-    );
-    return;
-  }
-
-  if (data === "stats_employees") {
-    requireOwner(user);
-    const s = await getStatsByEmployee(db, new Date());
-    if (!s.employees.length) {
-      await ctx.reply(`👷 ${s.date}\nChưa có NV giao hàng hôm nay.`, { reply_markup: statsMenu() });
-      return;
-    }
-    const lines = s.employees.map(
-      (e) =>
-        `· ${e.name}: ${e.deliveryCount} đơn | ${e.cylindersOut} bình giao | TM cầm ${e.cashHeld.toLocaleString("vi-VN")}đ`,
-    );
-    await ctx.reply(`👷 Theo NV — ${s.date}\n\n${lines.join("\n")}`, { reply_markup: statsMenu() });
-    return;
-  }
-
-  if (data === "stats_web") {
-    requireOwner(user);
-    await sendDashboardLink(ctx, db, user);
-    return;
-  }
-
-  if (data === "stats_orders") {
-    requireOwner(user);
-    const s = await getStatsOrders(db);
-    const formatOrderLine = (o: {
-      customerName: string;
-      status: string;
-      assignedEmployeeName: string | null;
-    }) => {
-      const nv = o.assignedEmployeeName ?? "chưa gán NV";
-      return `· ${o.customerName} — ${orderStatusText(o.status, true)} — 👷 ${nv}`;
-    };
-    const open = s.openList.length
-      ? s.openList.map(formatOrderLine).join("\n")
-      : "· Không có";
-    const done = s.completedList.length
-      ? s.completedList.map(formatOrderLine).join("\n")
-      : "· Không có";
-    await ctx.reply(
-      [
-        "📋 Đơn hàng",
-        `⏳ Chưa giao: ${s.notDelivered}`,
-        `🚚 Đang giao: ${s.delivering}`,
-        `✅ Đã giao: ${s.completed}`,
-        `❌ Đã huỷ: ${s.cancelled}`,
-        "",
-        "Chưa hoàn thành:",
-        open,
-        "",
-        "Đã giao gần đây:",
-        done,
-      ].join("\n"),
-      { reply_markup: statsOrdersMenu() },
-    );
-    return;
-  }
-
-
-  if (data === "customers") {
-    requireOwner(user);
-    await ctx.reply("👤 Quản lý khách hàng", {
-      reply_markup: customersMenu(),
-    });
-    return;
-  }
-
-  if (data === "customers_top10") {
-    requireOwner(user);
-    const top = await listTopCustomersByCompletedOrders(db, 10);
-    if (!top.length) {
-      await ctx.reply("🏆 Chưa có khách nào hoàn thành giao hàng.", {
-        reply_markup: customersMenu(),
-      });
-      return;
-    }
-    const lines = top.map(
-      (c, i) => `${i + 1}. ${c.name} — ${c.completedOrders} lần giao\n   📞 ${c.phone}`,
-    );
-    const kb = new InlineKeyboard();
-    for (const c of top) {
-      kb.text(customerPickButtonLabel(c), `customer_view:${c.id}`).row();
-    }
-    kb.text("◀️ Khách hàng", "customers");
-    await ctx.reply(
-      `🏆 Top ${top.length} khách (nhiều lần giao nhất)\n\n${lines.join("\n\n")}`,
-      { reply_markup: kb },
-    );
-    return;
-  }
-
-  if (data.startsWith("customer_view:")) {
-    requireOwner(user);
-    const customerId = data.slice("customer_view:".length);
-    await replyCustomerDetail(ctx, db, user, customerId);
+    await showCustomersHub(ctx, db);
     return;
   }
 
@@ -321,21 +180,12 @@ async function handleCallback(
     return;
   }
 
-  if (data === "customer_search") {
-    requireOwner(user);
-    setSession(ctx.from!.id, { step: "customer_search" });
-    await ctx.reply("🔍 Tìm khách — gõ tên, SĐT hoặc địa chỉ:", {
-      reply_markup: cancelCustomerMenu(),
-    });
-    return;
-  }
-
   if (data === "customer_save") {
     requireOwner(user);
     const session = getSession(ctx.from!.id);
     if (!session.customerDraft) {
       await ctx.reply("⚠️ Phiên hết hạn — bấm ➕ Thêm khách lại", {
-        reply_markup: customersMenu(),
+        reply_markup: new InlineKeyboard().text("◀️ Khách hàng", "customers"),
       });
       return;
     }
@@ -343,14 +193,16 @@ async function handleCallback(
     clearSession(ctx.from!.id);
     await ctx.reply(
       `✅ Thêm khách thành công!\n\n👤 ${c.name}\n📞 ${c.phone}\n📍 ${c.address}`,
-      { reply_markup: customersMenu() },
+      { reply_markup: new InlineKeyboard().text("◀️ Khách hàng", "customers") },
     );
     return;
   }
 
   if (data === "customer_cancel") {
     clearSession(ctx.from!.id);
-    await ctx.reply("❌ Đã huỷ thêm khách", { reply_markup: customersMenu() });
+    await ctx.reply("❌ Đã huỷ thêm khách", {
+      reply_markup: new InlineKeyboard().text("◀️ Khách hàng", "customers"),
+    });
     return;
   }
 
@@ -369,6 +221,10 @@ async function handleText(
 
   if (await handleOrderText(ctx, db, user, step, text)) return true;
   if (await handleSettingsText(ctx, db, user, step, text)) return true;
+  if (user.role === "owner") {
+    if (await handleTeamText(ctx, db, step, text)) return true;
+    if (await handleCustomerFlowText(ctx, db, step, text)) return true;
+  }
 
   if (
     (step === "idle" || step === "customer_add" || step === "customer_confirm") &&
@@ -396,9 +252,9 @@ async function handleText(
     return true;
   }
 
-  if (step === "search_query" || step === "customer_search") {
+  if (step === "search_query") {
     requireOwner(user);
-    await processCustomerSearch(ctx, db, telegramId, text);
+    await handleCustomerFlowText(ctx, db, "customer_search", text);
     return true;
   }
 
@@ -446,14 +302,16 @@ async function replyUnknownInput(ctx: Context, user: BotUser, step: string) {
     order_line_qty: "Nhập số bình cần giao (VD: 4).",
     fulfill_compact:
       "Nhập: <vỏ thu> <tiền>vnd <tm|ck|no>. Dùng dấu cách hoặc -. VD ghi nợ: 4 3 0vnd no",
-    settings_price_amount: "Nhập giá mới (VD: 350000).",
+    team_edit: "Gửi: Tên | SĐT",
+    team_assign_order: "Nhập mã đơn (8 ký tự đầu).",
+    customer_edit: "Gửi: Tên | SĐT | Địa chỉ",
   };
   await ctx.reply(`⚠️ ${hints[step] ?? "Bấm /menu để quay lại"}`, {
     reply_markup: mainMenu(user.role),
   });
 }
 
-export { mainMenu, statsMenu, adminMenu, employeeMenu, customersMenu } from "./keyboards.js";
+export { mainMenu, adminMenu, employeeMenu } from "./keyboards.js";
 
 function cancelCustomerMenu() {
   return new InlineKeyboard()
@@ -718,42 +576,3 @@ async function processPaymentInput(
   );
 }
 
-async function processCustomerSearch(
-  ctx: Context,
-  db: Db,
-  telegramId: number,
-  text: string,
-) {
-  const results = await searchCustomers(db, text);
-  clearSession(telegramId);
-  if (!results.length) {
-    await ctx.reply(`❌ Không tìm thấy khách với "${text}"`, {
-      reply_markup: customersMenu(),
-    });
-    return;
-  }
-
-  const lines = await Promise.all(
-    results.map(async (c) => {
-      const debt = await getCustomerDetail(db, c.id);
-      return formatCustomerSearchLine(
-        c,
-        ` (nợ ${debt.debtBalance.toLocaleString("vi-VN")}đ)`,
-      );
-    }),
-  );
-
-  const kb = new InlineKeyboard();
-  for (const c of results) {
-    kb.text(customerPickButtonLabel(c), `customer_view:${c.id}`).row();
-  }
-  kb.text("◀️ Khách hàng", "customers");
-
-  const header =
-    results.length === 1
-      ? "✅ Tìm thấy 1 khách"
-      : `✅ Tìm thấy ${results.length} khách`;
-  await ctx.reply(`${header} — chọn để xem chi tiết:\n\n${lines.join("\n\n")}`, {
-    reply_markup: kb,
-  });
-}

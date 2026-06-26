@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import {
   customers,
@@ -190,6 +190,47 @@ export async function getOrderDetail(db: Db, orderId: string) {
     .orderBy(deliveryOrderLines.sortOrder);
 
   return { order, lines };
+}
+
+/** Tìm đơn mở theo mã rút gọn (8 ký tự đầu UUID, không phân biệt hoa thường). */
+export async function findOpenOrderByShortCode(db: Db, code: string) {
+  const q = code.trim().toLowerCase().replace(/[^a-f0-9-]/g, "");
+  if (q.length < 4) throw validationError("Mã đơn quá ngắn");
+
+  const rows = await db
+    .select({ id: deliveryOrders.id })
+    .from(deliveryOrders)
+    .where(
+      and(
+        inArray(deliveryOrders.status, ["pending", "delivering"]),
+        sql`lower(${deliveryOrders.id}::text) like ${q + "%"}`,
+      ),
+    )
+    .limit(5);
+
+  if (!rows.length) throw notFoundError("Không tìm thấy đơn mở với mã này");
+  if (rows.length > 1) {
+    throw validationError("Mã đơn không đủ rõ — nhập thêm ký tự");
+  }
+  return getOrderDetail(db, rows[0].id);
+}
+
+/** Gán đơn chưa có người nhận — không đè đơn đã gán. */
+export async function assignOrderToEmployee(db: Db, orderId: string, employeeId: string) {
+  const detail = await getOrderDetail(db, orderId);
+  if (detail.order.status !== "pending" && detail.order.status !== "delivering") {
+    throw validationError("Chỉ gán được đơn chưa hoàn thành");
+  }
+  if (detail.order.assignedEmployeeId) {
+    throw validationError("Đơn đã có người nhận — không gán lại");
+  }
+
+  await db
+    .update(deliveryOrders)
+    .set({ assignedEmployeeId: employeeId })
+    .where(eq(deliveryOrders.id, orderId));
+
+  return getOrderDetail(db, orderId);
 }
 
 const PAYMENT_LABEL: Record<string, string> = {

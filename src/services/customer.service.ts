@@ -207,6 +207,48 @@ export async function listTopCustomersByCompletedOrders(db: Db, limit = 10) {
   }));
 }
 
+/** 10 khách hiển thị hub bot — ưu tiên giao gần nhất, thiếu thì khách mới tạo. */
+export async function listCustomersForHub(db: Db, limit = 10) {
+  const recent = await db
+    .select({
+      id: customers.id,
+      name: customers.name,
+      phone: customers.phone,
+      lastAt: sql<Date>`max(${deliveryOrders.completedAt})`,
+    })
+    .from(customers)
+    .innerJoin(
+      deliveryOrders,
+      and(
+        eq(deliveryOrders.customerId, customers.id),
+        eq(deliveryOrders.status, "completed"),
+      ),
+    )
+    .where(eq(customers.isActive, true))
+    .groupBy(customers.id, customers.name, customers.phone)
+    .orderBy(sql`max(${deliveryOrders.completedAt}) desc`)
+    .limit(limit);
+
+  const seen = new Set(recent.map((r) => r.id));
+  const result = recent.map((r) => ({ id: r.id, name: r.name, phone: r.phone }));
+
+  if (result.length < limit) {
+    const extra = await db
+      .select({ id: customers.id, name: customers.name, phone: customers.phone })
+      .from(customers)
+      .where(eq(customers.isActive, true))
+      .orderBy(sql`${customers.createdAt} desc`)
+      .limit(limit * 2);
+    for (const c of extra) {
+      if (result.length >= limit) break;
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      result.push(c);
+    }
+  }
+  return result;
+}
+
 export async function updateCustomer(
   db: Db,
   id: string,

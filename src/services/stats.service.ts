@@ -7,9 +7,11 @@ import {
   deliveryOrders,
   employees,
   cylinderTypes,
+  users,
 } from "../db/schema.js";
 import { getTotalCylindersOutside, getTotalDebtBalance, listDebtors } from "./ledger.service.js";
 import { getTotalGasSurplusKg } from "./gas-surplus.service.js";
+import { listTeamMembers } from "./employee.service.js";
 
 export type PaymentTag = "tm" | "ck" | "no";
 
@@ -302,6 +304,83 @@ export async function getDashboardTrend(db: Db, days = 7) {
   }
 
   return { days, points };
+}
+
+/** Tổng quan bot — Tong_Quan menu Thống kê */
+export async function getStatsOverview(db: Db) {
+  const [adminRow] = await db
+    .select({ n: count() })
+    .from(users)
+    .where(eq(users.role, "owner"));
+  const team = await listTeamMembers(db);
+  const employeeCount = team.filter((m) => !m.isOwner && m.role === "employee").length;
+  const [custRow] = await db
+    .select({ n: count() })
+    .from(customers)
+    .where(eq(customers.isActive, true));
+  const month = await getStatsByMonth(db, new Date());
+  const totalDebt = await getTotalDebtBalance(db);
+
+  return {
+    adminCount: Number(adminRow?.n ?? 0),
+    employeeCount,
+    customerCount: Number(custRow?.n ?? 0),
+    monthRevenue: month.cashRevenue + month.transferRevenue,
+    monthCash: month.cashRevenue,
+    monthTransfer: month.transferRevenue,
+    monthOrderCount: month.orderCount,
+    monthDebtAdded: month.debtAdded,
+    totalDebt,
+    monthLabel: month.date,
+  };
+}
+
+function weekRange(date: Date) {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(date);
+  start.setDate(start.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  return { start, end };
+}
+
+export async function getStatsByWeek(db: Db, date: Date) {
+  const { start, end } = weekRange(date);
+  return getStatsByRange(db, start, end);
+}
+
+export async function getStatsByCustomer(db: Db, date: Date) {
+  const { start, end } = monthRange(date);
+  const rows = await db
+    .select({
+      name: customers.name,
+      phone: customers.phone,
+      deliveryCount: count(deliveries.id),
+      cylindersOut: sum(deliveryLines.cylindersOut),
+    })
+    .from(deliveries)
+    .innerJoin(customers, eq(customers.id, deliveries.customerId))
+    .leftJoin(deliveryLines, eq(deliveryLines.deliveryId, deliveries.id))
+    .where(
+      and(
+        eq(deliveries.status, "active"),
+        gte(deliveries.deliveredAt, start),
+        lte(deliveries.deliveredAt, end),
+      ),
+    )
+    .groupBy(customers.id, customers.name, customers.phone)
+    .orderBy(sql`count(${deliveries.id}) desc`)
+    .limit(15);
+
+  return {
+    periodLabel: start.toISOString().slice(0, 7),
+    customers: rows.map((r) => ({
+      name: r.name,
+      phone: r.phone,
+      deliveryCount: Number(r.deliveryCount),
+      cylindersOut: Number(r.cylindersOut ?? 0),
+    })),
+  };
 }
 
 export async function getDashboard(
