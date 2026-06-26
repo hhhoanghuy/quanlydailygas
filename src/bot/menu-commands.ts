@@ -3,6 +3,7 @@ import type { Db } from "../db/index.js";
 import { getUserByTelegramId } from "../services/auth.service.js";
 import { sendDashboardLink } from "./dashboard-link.js";
 import { adminMenu, employeeMenu, mainMenu } from "./keyboards.js";
+import { buildHelpText } from "./help-content.js";
 import type { users } from "../db/schema.js";
 
 type BotUser = typeof users.$inferSelect;
@@ -25,39 +26,11 @@ export async function replyEmployeeMenu(ctx: Context) {
   await ctx.reply("📋 Menu Nhân Viên", { reply_markup: employeeMenu() });
 }
 
-export function buildHelpText(role?: string) {
-  const lines = [
-    "📖 Trợ giúp GasOS",
-    "",
-    "/start — Bắt đầu hoặc kích hoạt mã mời",
-    "/menu — Menu theo vai trò của bạn",
-    "/help — Xem trợ giúp này",
-    "/no <tên|SĐT> — Tra nợ nhanh",
-  ];
-
-  if (role === "owner") {
-    lines.push(
-      "",
-      "Chủ đại lý:",
-      "/menu_admin — Menu quản trị",
-      "/weblogin — Đăng nhập dashboard web",
-    );
-  } else if (role === "employee") {
-    lines.push("", "Nhân viên:", "/nhan_vien — Menu nhân viên");
-  } else {
-    lines.push(
-      "",
-      "/menu_admin — Menu quản trị (chủ)",
-      "/nhan_vien — Menu nhân viên",
-      "/weblogin — Dashboard web (chủ)",
-    );
-  }
-
-  return lines.join("\n");
-}
+export { buildHelpText } from "./help-content.js";
 
 export async function sendHelp(ctx: Context, role?: string) {
-  await ctx.reply(buildHelpText(role));
+  const { helpMenu } = await import("./keyboards.js");
+  await ctx.reply(buildHelpText(role), { reply_markup: helpMenu() });
 }
 
 export async function sendWebLogin(ctx: Context, db: Db, user: BotUser) {
@@ -65,7 +38,7 @@ export async function sendWebLogin(ctx: Context, db: Db, user: BotUser) {
 }
 
 export const NOT_ACTIVATED =
-  "❌ Chưa kích hoạt tài khoản.\n\nBấm link mã mời hoặc gõ:\n/start GAS-XXXXXXXX";
+  "❌ Chưa kích hoạt tài khoản.\n\nBấm link mã mời hoặc gõ:\n/start GAS-XXXXXXXX\n\nGõ /help để xem hướng dẫn chi tiết.";
 
 export const SUPER_ADMIN_PLACEHOLDER =
   "🔧 Menu Quản Trị Hệ Thống chưa phát triển.\n\nTính năng multi-tenant sẽ có ở phase sau.";

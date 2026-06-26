@@ -175,6 +175,38 @@ export async function listCustomers(
   });
 }
 
+/** Top khách theo số lần giao hoàn thành (completed delivery_orders). */
+export async function listTopCustomersByCompletedOrders(db: Db, limit = 10) {
+  const rows = await db
+    .select({
+      id: customers.id,
+      name: customers.name,
+      phone: customers.phone,
+      address: customers.address,
+      completedOrders: sql<number>`count(${deliveryOrders.id})::int`,
+    })
+    .from(customers)
+    .innerJoin(
+      deliveryOrders,
+      and(
+        eq(deliveryOrders.customerId, customers.id),
+        eq(deliveryOrders.status, "completed"),
+      ),
+    )
+    .where(eq(customers.isActive, true))
+    .groupBy(customers.id, customers.name, customers.phone, customers.address)
+    .orderBy(sql`count(${deliveryOrders.id}) desc`)
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    phone: r.phone,
+    address: r.address,
+    completedOrders: Number(r.completedOrders),
+  }));
+}
+
 export async function updateCustomer(
   db: Db,
   id: string,

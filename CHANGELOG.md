@@ -9,9 +9,10 @@
 
 ### Changed
 
-- Menu chủ: Đội ngũ, Khách hàng, Thống kê, Cài đặt (+ Đơn mở, Thu nợ, Lên đơn tạm đến P1)
-- Menu NV: Xem đơn, Nhận đơn (stub P2), Kiểm tra công nợ — **bỏ Thu nợ**
-- Thu nợ chỉ chủ đại lý (menu + thẻ tra nợ)
+- Menu chủ **chỉ 4 nút** (roadmap): Đội ngũ · Khách hàng · Thống kê · Cài đặt
+- Lên đơn / Thu nợ chuyển vào **chi tiết khách**; Top 10 khách theo lần giao
+- Đơn mở: **Thống kê → Đơn hàng → Quản lý đơn mở**
+- Menu NV: Xem đơn, Nhận đơn (stub P2), Kiểm tra công nợ — bỏ Thu nợ
 
 ---
 

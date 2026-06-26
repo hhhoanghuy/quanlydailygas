@@ -52,17 +52,22 @@ Nhận mã GAS-XXXXXXXX (owner seed / mã mời NV)
 | `/nhan_vien` | NV | Menu nhân viên |
 | `/menu_super_admin` | — | **Backlog** |
 | `/help` | Chủ (+ NV?) | Trợ giúp lệnh |
-| `/weblogin` | Chủ | Magic link → dashboard web |
+| `/weblogin` | Chủ | Lệnh tắt — cùng chức năng **Thống kê → Đăng nhập web** |
 | `/no <query>` | Chủ, NV | Tra nợ nhanh (giữ tùy chọn) |
 
-### `/help` (chủ)
+### Trợ giúp (nút ❓ / lệnh `/help`)
 
-```
-/help
-├── /start        → Bắt đầu / menu
-├── /weblogin     → Đăng nhập trang quản trị web
-└── /...          → Mở rộng sau (VD: /no)
-```
+Nội dung **chi tiết từng bước** — không chỉ liệt kê lệnh. Khác nhau theo vai trò:
+
+| Đối tượng | Nội dung chính |
+|-----------|----------------|
+| Chưa kích hoạt | Cách /start + mã mời |
+| Chủ | Kích hoạt, từng nút menu, thêm khách, lên đơn, thu nợ, đơn mở, mời NV |
+| NV | Kích hoạt, xem/nhận đơn, cú pháp giao hàng (VD tm/ck/no), lưu ý không thu nợ |
+
+**Đăng nhập web:** chỉ qua **📊 Thống kê → 🌐 Đăng nhập web** (không nút trong Trợ giúp). Lệnh `/weblogin` là shortcut tùy chọn.
+
+Source: `src/bot/help-content.ts`
 
 ---
 
@@ -70,11 +75,11 @@ Nhận mã GAS-XXXXXXXX (owner seed / mã mời NV)
 
 ```
 /menu_admin
-├── Doi_Ngu              (Quản lý nhân sự)
-├── Khach_Hang           (Quản lý khách hàng)
-├── Thong_Ke             (Thống kê)
-├── Cai_Dat              (Cài đặt → Gas)
-└── /help                (Trợ giúp)
+├── Doi_Ngu
+├── Khach_Hang
+├── Thong_Ke
+├── Cai_Dat
+└── Trợ giúp          → /help, /weblogin, /start…
 ```
 
 > **Không còn** nút **「📞 Lên đơn」** ở menu gốc — lên đơn đi từ **Khách hàng → Tạo đơn**.
@@ -127,7 +132,7 @@ Khách chưa từng giao xong **không** vào top 10 (vẫn tìm được qua Ti
 
 \*Người có thể giao = chủ (luôn) + NV `active`.
 
-**Đơn chưa gán:** không notify cá nhân; hiện trong **Nhận đơn** (NV) và **Đơn mở** (chủ).
+**Đơn chưa gán:** pool **Nhận đơn** (NV). Chủ xem/quản lý đơn mở: **Thống kê → Đơn hàng → Quản lý đơn mở** (không ở menu gốc).
 
 ---
 
@@ -307,7 +312,10 @@ sequenceDiagram
 
 | Mục | Code hiện tại |
 |-----|----------------|
-| Menu chủ | `📞 Lên đơn`, `👤 Khách`, `📋 Đơn mở`, `💵 Thu nợ`, `📊`, `⚙️` |
+| Menu chủ | **5 nút:** Đội ngũ · Khách hàng · Thống kê · Cài đặt · **Trợ giúp** |
+| Lên đơn | **Khách → chi tiết → Tạo đơn** |
+| Thu nợ | **Khách → chi tiết → Thu nợ** (chủ only) |
+| Đơn mở | **Thống kê → Đơn hàng → Quản lý đơn mở** |
 | Mã mời NV | Bot **⚙️ Cài đặt** (sẽ chuyển **Đội ngũ**) |
 | Web login | **Thống kê → Web** (sẽ → `/weblogin`) |
 | Gán đơn | Lúc lên đơn; auto 1 người; **chưa** pool Nhan_Don |
