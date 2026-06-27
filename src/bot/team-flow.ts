@@ -3,7 +3,8 @@ import type { Db } from "../db/index.js";
 import type { users } from "../db/schema.js";
 import { createInviteCode, buildInviteDeepLink, createCoOwnerInvite, countCoOwners } from "../services/auth.service.js";
 import { listTeamMembers, updateEmployee } from "../services/employee.service.js";
-import { isPrimaryOwnerRole, MAX_CO_OWNERS } from "../../utils/auth-roles.js";
+import { ensureEmployeeId } from "../services/auth.service.js";
+import { isAdminRole, isPrimaryOwnerRole, MAX_CO_OWNERS } from "../../utils/auth-roles.js";
 import {
   assignOrderToEmployee,
   findOpenOrderByShortCode,
@@ -19,7 +20,10 @@ function teamMemberButtonLabel(name: string, roleLabel: string) {
   return `${name} — ${roleLabel}`.slice(0, 64);
 }
 
-export async function showTeamList(ctx: Context, db: Db, actor?: { role: string }) {
+export async function showTeamList(ctx: Context, db: Db, actor?: BotUser) {
+  if (actor && isAdminRole(actor.role)) {
+    await ensureEmployeeId(db, actor);
+  }
   const team = await listTeamMembers(db);
   if (!team.length) {
     await ctx.reply("👷 Chưa có nhân sự.", { reply_markup: backMenu() });

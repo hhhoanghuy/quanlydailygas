@@ -1,12 +1,15 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { db } from "./db/index.js";
+import { ensureDbSchema } from "./db/ensure-schema.js";
 import { AppError } from "../utils/errors.js";
 import { registerApiRoutes } from "./routes/api.js";
 import { registerDashboardWeb } from "./routes/dashboard-web.js";
 import { registerBot } from "./bot/telegram.js";
 
 export async function buildApp() {
+  await ensureDbSchema();
+
   const app = Fastify({ logger: true });
 
   await app.register(cors, { origin: true });

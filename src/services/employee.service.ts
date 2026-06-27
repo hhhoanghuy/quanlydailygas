@@ -67,7 +67,7 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
       userCreatedAt: users.createdAt,
     })
     .from(users)
-    .innerJoin(employees, eq(users.employeeId, employees.id))
+    .leftJoin(employees, eq(users.employeeId, employees.id))
     .where(inArray(users.role, ["owner", "co_owner"]))
     .orderBy(asc(users.createdAt));
 
@@ -78,10 +78,10 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
     const delCount = await deliveriesThisMonth(db, a.employeeId);
     result.push({
       id: a.employeeId,
-      name: a.name || a.empName,
-      phone: a.empPhone,
-      active: a.empActive,
-      createdAt: a.empCreatedAt,
+      name: a.name || a.empName || "Quản trị",
+      phone: a.empPhone ?? "—",
+      active: a.empActive ?? true,
+      createdAt: a.empCreatedAt ?? a.userCreatedAt,
       hasTelegram: true,
       telegramUsername: a.telegramUsername,
       role,
