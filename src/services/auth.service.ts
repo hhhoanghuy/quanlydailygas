@@ -1,4 +1,4 @@
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, count } from "drizzle-orm";
 import { createHmac, createHash } from "node:crypto";
 import { customAlphabet } from "nanoid";
 import type { Db } from "../db/index.js";
@@ -10,6 +10,9 @@ import {
 } from "../db/schema.js";
 import { validationError, unauthorizedError, forbiddenError } from "../../utils/errors.js";
 import { getBotUsername, getPublicBaseUrl } from "../config/env.js";
+import { MAX_CO_OWNERS, isAdminRole, isPrimaryOwnerRole } from "../../utils/auth-roles.js";
+
+export type InviteRole = "owner" | "co_owner" | "employee";
 
 const genToken = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 48);
 const genInviteCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8);
@@ -18,9 +21,26 @@ const genMagicCode = customAlphabet("abcdefghijklmnopqrstuvwxyz0123456789", 16);
 const MAGIC_LINK_TTL_MINUTES = 5;
 const WEB_SESSION_TTL_MINUTES = 8 * 60;
 
+export async function countCoOwners(db: Db) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(users)
+    .where(eq(users.role, "co_owner"));
+  return Number(row?.n ?? 0);
+}
+
+export async function hasPrimaryOwner(db: Db) {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.role, "owner"))
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function createInviteCode(
   db: Db,
-  role: "owner" | "employee",
+  role: InviteRole,
   expiresInHours = 72,
 ) {
   const code = `GAS-${genInviteCode()}`;
@@ -32,6 +52,16 @@ export async function createInviteCode(
     .returning();
 
   return row;
+}
+
+/** Chủ chính mời co-owner — tối đa MAX_CO_OWNERS. */
+export async function createCoOwnerInvite(db: Db, actor: { role: string }) {
+  assertPrimaryOwner(actor);
+  const n = await countCoOwners(db);
+  if (n >= MAX_CO_OWNERS) {
+    throw validationError(`Đã đủ ${MAX_CO_OWNERS} quản trị viên.`);
+  }
+  return createInviteCode(db, "co_owner", 72);
 }
 
 export async function activateInvite(
@@ -62,12 +92,28 @@ export async function activateInvite(
   if (invite.usedByUserId) throw validationError("Mã mời đã được sử dụng");
   if (invite.expiresAt < new Date()) throw validationError("Mã mời đã hết hạn");
 
+  if (invite.role === "owner") {
+    if (await hasPrimaryOwner(db)) {
+      throw validationError("Mã chủ đại lý chỉ dùng khi cài đặt lần đầu.");
+    }
+  }
+  if (invite.role === "co_owner") {
+    const n = await countCoOwners(db);
+    if (n >= MAX_CO_OWNERS) {
+      throw validationError(`Đã đủ ${MAX_CO_OWNERS} quản trị viên.`);
+    }
+  }
+
   let employeeId: string | null = null;
+  const empPhone =
+    invite.role === "employee" || invite.role === "co_owner"
+      ? String(input.telegramUserId)
+      : "owner";
   const [emp] = await db
     .insert(employees)
     .values({
       name: input.name,
-      phone: invite.role === "employee" ? String(input.telegramUserId) : "owner",
+      phone: empPhone,
       active: true,
     })
     .returning();
@@ -96,7 +142,7 @@ export async function activateInvite(
 export async function createMagicLink(db: Db, userId: string) {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user) throw unauthorizedError("User không tồn tại");
-  assertOwner(user);
+  assertAdmin(user);
 
   const code = genMagicCode();
   const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MINUTES * 60_000);
@@ -142,7 +188,7 @@ export async function exchangeMagicLink(db: Db, code: string) {
   if (!row) {
     throw unauthorizedError("Link đăng nhập hết hạn (5 phút) hoặc đã được sử dụng");
   }
-  assertOwner(row.user);
+  assertAdmin(row.user);
 
   await db.delete(sessions).where(eq(sessions.id, row.session.id));
 
@@ -217,10 +263,22 @@ export async function ensureEmployeeId(db: Db, user: typeof users.$inferSelect) 
   return emp.id;
 }
 
-export function assertOwner(user: { role: string }) {
-  if (user.role !== "owner") {
-    throw forbiddenError("Chỉ chủ đại lý mới có quyền này");
+export function assertAdmin(user: { role: string }) {
+  if (!isAdminRole(user.role)) {
+    throw forbiddenError("Chỉ quản trị viên mới có quyền này");
   }
+}
+
+/** Chủ chính — duy nhất role `owner`. */
+export function assertPrimaryOwner(user: { role: string }) {
+  if (!isPrimaryOwnerRole(user.role)) {
+    throw forbiddenError("Chỉ chủ đại lý chính mới có quyền này");
+  }
+}
+
+/** @deprecated dùng assertAdmin hoặc assertPrimaryOwner */
+export function assertOwner(user: { role: string }) {
+  assertAdmin(user);
 }
 
 export function assertEmployeeDelivery(user: { role: string; employeeId: string | null }) {
@@ -237,7 +295,7 @@ export function resolveEmployeeId(
     return user.employeeId!;
   }
   if (requestedId) return requestedId;
-  throw validationError("employee_id bắt buộc cho owner");
+  throw validationError("employee_id bắt buộc");
 }
 
 /** Chuẩn hoá mã mời: GAS-XXXXXXXX */
@@ -307,7 +365,7 @@ export async function loginWithTelegramWebApp(db: Db, initData: string) {
       "Tài khoản chưa kích hoạt — nhắn /start <mã mời> trong bot trước khi đăng nhập web.",
     );
   }
-  assertOwner(user);
+  assertAdmin(user);
   const session = await createSession(db, user.id, "web", WEB_SESSION_TTL_MINUTES);
   return {
     token: session.token,

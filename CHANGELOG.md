@@ -2,7 +2,7 @@
 
 ### Added
 
-- Bot menu v2 **P0**: `/menu_admin`, `/nhan_vien`, `/help`, `/weblogin`, `/menu_super_admin` (placeholder)
+- **Co-owner (quản trị viên)**: tối đa 3 người; mời từ **Đội ngũ** (chỉ chủ chính); quyền vận hành = chủ; `docs/features/co-owner.md`
 - `docs/BACKUP-PRE-MENU-V2.md` + git tag `backup/pre-bot-menu-v2`
 - `npm run db:reset` — xoá data + seed owner invite
 - `docs/05-user-flow.md` v2 — roadmap menu bot

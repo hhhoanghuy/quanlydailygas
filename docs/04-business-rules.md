@@ -119,10 +119,13 @@ Chi tiết: `docs/features/gas-du-nm.md`
 
 | Rule | Chi tiết |
 |------|----------|
-| BR-A01 | 2 role: `owner`, `employee` |
-| BR-A02 | Magic link / dashboard: **owner only** |
-| BR-A03 | Mã mời NV: TTL 72h; owner seed 8760h |
+| BR-A01 | 3 role: `owner` (chủ chính ×1), `co_owner` (×3), `employee` |
+| BR-A02 | Magic link / dashboard: **owner + co_owner** |
+| BR-A03 | Mã mời NV: TTL 72h; mã owner seed 8760h (bootstrap chủ chính) |
 | BR-A04 | Magic link TTL 5 phút, one-time (chỉ để đăng nhập); sau đổi code → phiên web TTL 8h — link hết hạn **không** kết thúc phiên đang mở |
+| BR-A05 | Tối đa **1** `owner` + **3** `co_owner` — chi tiết `docs/features/co-owner.md` |
+| BR-A06 | Chỉ **chủ chính** (`owner`) mời `co_owner`; co_owner **không** mời thêm |
+| BR-A07 | Mã co_owner: TTL 72h, one-time; MVP **không** thu hồi quyền |
 
 ---
 

@@ -9,6 +9,7 @@ import {
 } from "../services/stats.service.js";
 import { statsDrilldownMenu } from "./keyboards.js";
 import { sendDashboardLink } from "./dashboard-link.js";
+import { isAdminRole, MAX_CO_OWNERS } from "../../utils/auth-roles.js";
 import type { users } from "../db/schema.js";
 
 type BotUser = typeof users.$inferSelect;
@@ -18,7 +19,8 @@ export async function showStatsOverview(ctx: Context, db: Db) {
   const text = [
     "📊 TỔNG QUAN",
     "",
-    `👑 Số quản trị viên: ${o.adminCount}`,
+    `👑 Chủ chính: ${o.primaryOwnerCount}`,
+    `🛡 Quản trị viên: ${o.coOwnerCount}/${MAX_CO_OWNERS}`,
     `👷 Số nhân viên: ${o.employeeCount}`,
     `👤 Số khách hàng: ${o.customerCount}`,
     "",

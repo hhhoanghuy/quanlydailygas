@@ -4,6 +4,8 @@ import { getUserByTelegramId } from "../services/auth.service.js";
 import { sendDashboardLink } from "./dashboard-link.js";
 import { adminMenu, employeeMenu, mainMenu } from "./keyboards.js";
 import { buildHelpText } from "./help-content.js";
+import { adminMenuRole, isAdminRole } from "../../utils/auth-roles.js";
+
 import type { users } from "../db/schema.js";
 
 type BotUser = typeof users.$inferSelect;
@@ -13,9 +15,9 @@ export async function getActivatedUser(db: Db, telegramUserId: number) {
 }
 
 export async function replyMenuForUser(ctx: Context, user: BotUser) {
-  const isOwner = user.role === "owner";
-  const title = isOwner ? "📋 Menu Quản Trị" : "📋 Menu Nhân Viên";
-  await ctx.reply(title, { reply_markup: mainMenu(user.role) });
+  const isAdmin = isAdminRole(user.role);
+  const title = isAdmin ? "📋 Menu Quản Trị" : "📋 Menu Nhân Viên";
+  await ctx.reply(title, { reply_markup: mainMenu(adminMenuRole(user.role)) });
 }
 
 export async function replyAdminMenu(ctx: Context) {

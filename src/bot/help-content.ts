@@ -1,5 +1,7 @@
 /** Nội dung trợ giúp chi tiết — người mới chưa biết cũng làm theo được. */
 
+import { isAdminRole } from "../../utils/auth-roles.js";
+
 export function buildOwnerHelpText(): string {
   return [
     "📖 HƯỚNG DẪN — CHỦ ĐẠI LÝ",
@@ -11,7 +13,7 @@ export function buildOwnerHelpText(): string {
     "• Thấy menu quản trị → bạn đã kích hoạt xong.",
     "",
     "━━ 2. MENU CHÍNH (gõ /menu_admin) ━━",
-    "👷 Đội ngũ — quản lý nhân viên, tạo mã mời NV (đang bổ sung).",
+    "👷 Đội ngũ — quản lý nhân sự, mời quản trị viên (chủ chính), mời NV.",
     "👤 Khách hàng — thêm/tìm khách, lên đơn, thu nợ.",
     "📊 Thống kê — doanh thu, đơn hàng, **đăng nhập dashboard web**.",
     "⚙️ Cài đặt — giá bình gas, mã mời NV (tạm).",
@@ -134,7 +136,7 @@ export function buildGuestHelpText(): string {
 }
 
 export function buildHelpText(role?: string): string {
-  if (role === "owner") return buildOwnerHelpText();
+  if (role && isAdminRole(role)) return buildOwnerHelpText();
   if (role === "employee") return buildEmployeeHelpText();
   return buildGuestHelpText();
 }

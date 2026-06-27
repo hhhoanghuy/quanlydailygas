@@ -308,12 +308,16 @@ export async function getDashboardTrend(db: Db, days = 7) {
 
 /** Tổng quan bot — Tong_Quan menu Thống kê */
 export async function getStatsOverview(db: Db) {
-  const [adminRow] = await db
+  const [primaryRow] = await db
     .select({ n: count() })
     .from(users)
     .where(eq(users.role, "owner"));
+  const [coRow] = await db
+    .select({ n: count() })
+    .from(users)
+    .where(eq(users.role, "co_owner"));
   const team = await listTeamMembers(db);
-  const employeeCount = team.filter((m) => !m.isOwner && m.role === "employee").length;
+  const employeeCount = team.filter((m) => m.role === "employee").length;
   const [custRow] = await db
     .select({ n: count() })
     .from(customers)
@@ -322,7 +326,9 @@ export async function getStatsOverview(db: Db) {
   const totalDebt = await getTotalDebtBalance(db);
 
   return {
-    adminCount: Number(adminRow?.n ?? 0),
+    primaryOwnerCount: Number(primaryRow?.n ?? 0),
+    coOwnerCount: Number(coRow?.n ?? 0),
+    adminCount: Number(primaryRow?.n ?? 0) + Number(coRow?.n ?? 0),
     employeeCount,
     customerCount: Number(custRow?.n ?? 0),
     monthRevenue: month.cashRevenue + month.transferRevenue,

@@ -625,22 +625,37 @@ export type DeliveryWorker = {
   telegramUserId: number | null;
 };
 
-/** Chủ đại lý + NV đang hoạt động — ai có thể nhận đơn giao. */
-export async function listDeliveryWorkers(
-  db: Db,
-  owner: { name: string; telegramUserId: number | null },
-  ownerEmployeeId: string,
-): Promise<DeliveryWorker[]> {
-  const workers: DeliveryWorker[] = [
-    {
-      employeeId: ownerEmployeeId,
-      name: owner.name,
-      isOwner: true,
-      telegramUserId: owner.telegramUserId,
-    },
-  ];
-  const employees = await listActiveEmployees(db);
-  for (const emp of employees) {
+/** Chủ/co-owner + NV đang hoạt động — ai có thể nhận đơn giao. */
+export async function listDeliveryWorkers(db: Db): Promise<DeliveryWorker[]> {
+  const workers: DeliveryWorker[] = [];
+  const seen = new Set<string>();
+
+  const admins = await db
+    .select({
+      employeeId: users.employeeId,
+      name: users.name,
+      role: users.role,
+      telegramUserId: users.telegramUserId,
+    })
+    .from(users)
+    .innerJoin(employees, eq(employees.id, users.employeeId))
+    .where(and(inArray(users.role, ["owner", "co_owner"]), eq(employees.active, true)));
+
+  for (const a of admins) {
+    if (!a.employeeId || seen.has(a.employeeId)) continue;
+    seen.add(a.employeeId);
+    workers.push({
+      employeeId: a.employeeId,
+      name: a.name,
+      isOwner: a.role === "owner",
+      telegramUserId: a.telegramUserId,
+    });
+  }
+
+  const activeEmployees = await listActiveEmployees(db);
+  for (const emp of activeEmployees) {
+    if (seen.has(emp.employeeId)) continue;
+    seen.add(emp.employeeId);
     workers.push({
       employeeId: emp.employeeId,
       name: emp.name,

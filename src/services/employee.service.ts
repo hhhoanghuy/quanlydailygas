@@ -1,8 +1,9 @@
-import { eq, and, count, gte, lte, or, isNull } from "drizzle-orm";
+import { eq, and, count, gte, lte, or, isNull, inArray, asc } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { deliveries, employees, users } from "../db/schema.js";
 import { notFoundError, validationError } from "../../utils/errors.js";
 import { normalizePhone } from "../../utils/phone.js";
+import { roleDisplayLabel } from "../../utils/auth-roles.js";
 
 function monthRange(date = new Date()) {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -12,7 +13,7 @@ function monthRange(date = new Date()) {
   return { start, end };
 }
 
-export type TeamMemberRole = "owner" | "employee" | "pending";
+export type TeamMemberRole = "owner" | "co_owner" | "employee" | "pending";
 
 export type TeamMember = {
   id: string;
@@ -22,19 +23,13 @@ export type TeamMember = {
   createdAt: Date;
   hasTelegram: boolean;
   telegramUsername: string | null;
-  /** owner | employee | pending (NV chưa kích hoạt Telegram) */
   role: TeamMemberRole;
-  /** Nhãn tiếng Việt hiển thị UI */
   roleLabel: string;
+  /** Chủ chính (role owner) */
   isOwner: boolean;
+  isCoOwner: boolean;
   deliveriesThisMonth: number;
 };
-
-function roleLabel(role: TeamMemberRole): string {
-  if (role === "owner") return "Chủ đại lý";
-  if (role === "employee") return "Nhân viên";
-  return "Chưa kích hoạt";
-}
 
 async function deliveriesThisMonth(db: Db, employeeId: string) {
   const { start, end } = monthRange();
@@ -52,14 +47,16 @@ async function deliveriesThisMonth(db: Db, employeeId: string) {
   return Number(row?.n ?? 0);
 }
 
-/** Danh sách đội ngũ: chủ đại lý + nhân viên — phân vai trò rõ ràng */
+/** Danh sách đội ngũ: chủ chính + co-owner + nhân viên */
 export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
   const { start, end } = monthRange();
   const result: TeamMember[] = [];
+  const adminEmployeeIds = new Set<string>();
 
-  const [ownerUser] = await db
+  const adminUsers = await db
     .select({
       userId: users.id,
+      userRole: users.role,
       name: users.name,
       telegramUsername: users.telegramUsername,
       employeeId: users.employeeId,
@@ -67,25 +64,30 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
       empPhone: employees.phone,
       empActive: employees.active,
       empCreatedAt: employees.createdAt,
+      userCreatedAt: users.createdAt,
     })
     .from(users)
     .innerJoin(employees, eq(users.employeeId, employees.id))
-    .where(eq(users.role, "owner"))
-    .limit(1);
+    .where(inArray(users.role, ["owner", "co_owner"]))
+    .orderBy(asc(users.createdAt));
 
-  if (ownerUser?.employeeId) {
-    const delCount = await deliveriesThisMonth(db, ownerUser.employeeId);
+  for (const a of adminUsers) {
+    if (!a.employeeId) continue;
+    adminEmployeeIds.add(a.employeeId);
+    const role = a.userRole as TeamMemberRole;
+    const delCount = await deliveriesThisMonth(db, a.employeeId);
     result.push({
-      id: ownerUser.employeeId,
-      name: ownerUser.name || ownerUser.empName,
-      phone: ownerUser.empPhone,
-      active: ownerUser.empActive,
-      createdAt: ownerUser.empCreatedAt,
+      id: a.employeeId,
+      name: a.name || a.empName,
+      phone: a.empPhone,
+      active: a.empActive,
+      createdAt: a.empCreatedAt,
       hasTelegram: true,
-      telegramUsername: ownerUser.telegramUsername,
-      role: "owner",
-      roleLabel: roleLabel("owner"),
-      isOwner: true,
+      telegramUsername: a.telegramUsername,
+      role,
+      roleLabel: roleDisplayLabel(role),
+      isOwner: role === "owner",
+      isCoOwner: role === "co_owner",
       deliveriesThisMonth: delCount,
     });
   }
@@ -127,7 +129,7 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
     .orderBy(employees.name);
 
   for (const r of nvRows) {
-    if (ownerUser?.employeeId && r.id === ownerUser.employeeId) continue;
+    if (adminEmployeeIds.has(r.id)) continue;
     const role: TeamMemberRole = r.userId && r.userRole === "employee" ? "employee" : "pending";
     result.push({
       id: r.id,
@@ -138,8 +140,9 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
       hasTelegram: Boolean(r.userId),
       telegramUsername: r.telegramUsername,
       role,
-      roleLabel: roleLabel(role),
+      roleLabel: roleDisplayLabel(role),
       isOwner: false,
+      isCoOwner: false,
       deliveriesThisMonth: Number(r.deliveriesThisMonth ?? 0),
     });
   }
@@ -148,13 +151,12 @@ export async function listTeamMembers(db: Db): Promise<TeamMember[]> {
 }
 
 export async function setEmployeeActive(db: Db, id: string, active: boolean) {
-  const [ownerLink] = await db
+  const adminLinks = await db
     .select({ employeeId: users.employeeId })
     .from(users)
-    .where(eq(users.role, "owner"))
-    .limit(1);
-  if (ownerLink?.employeeId === id) {
-    throw notFoundError("Không thể thay đổi trạng thái chủ đại lý");
+    .where(inArray(users.role, ["owner", "co_owner"]));
+  if (adminLinks.some((l) => l.employeeId === id)) {
+    throw notFoundError("Không thể thay đổi trạng thái quản trị viên");
   }
 
   const [row] = await db
@@ -169,7 +171,7 @@ export async function setEmployeeActive(db: Db, id: string, active: boolean) {
 /** @deprecated dùng listTeamMembers — giữ tương thích API cũ */
 export async function listEmployees(db: Db) {
   const team = await listTeamMembers(db);
-  return team.filter((m) => !m.isOwner);
+  return team.filter((m) => m.role === "employee" || m.role === "pending");
 }
 
 export async function updateEmployee(

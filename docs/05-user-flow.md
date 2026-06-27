@@ -90,13 +90,15 @@ Source: `src/bot/help-content.ts`
 
 ```
 Doi_Ngu
-├── Danh sách: Chủ + NV (vai trò, Telegram, trạng thái)
-├── [+ Tạo mã mời NV]     → mã GAS-… + deep link (TTL 72h)
+├── Danh sách: Chủ chính + Quản trị viên (≤3) + NV
+├── [+ Mời quản trị viên]   → CHỈ chủ chính; mã co_owner TTL 72h (tối đa 3 co-owner)
+├── [+ Tạo mã mời NV]        → mã GAS-… + deep link (TTL 72h)
 └── Chọn người → Chi_Tiet_Nhan_Su
-    ├── Cap_Nhat          → Sửa tên, SĐT (đồng bộ Telegram nếu đã kích hoạt)
-    └── Giao_Viec
-        └── Tim_Ma_Don    → Gõ mã đơn → gán/reassign NV (chỉ đơn pending/delivering)
+    ├── Cap_Nhat          → Sửa tên, SĐT (NV; co-owner/chủ nếu áp dụng)
+    └── Giao_Viec         → CHỈ NV — gán đơn chưa có người nhận
 ```
+
+**Co-owner:** quyền vận hành = chủ chính (lên đơn, khách, thu nợ, thống kê, web, mời NV) — **không** mời co-owner thêm. Chi tiết: `docs/features/co-owner.md`.
 
 **Giao việc từ Đội ngũ:** chủ chọn NV → nhập **mã đơn** → gán **chỉ khi đơn chưa có người nhận**. Sau khi NV **Nhan_Don** (hoặc đã gán người giao), **khóa** — chủ không gán lại.
 
@@ -141,7 +143,7 @@ Khách chưa từng giao xong **không** vào top 10 (vẫn tìm được qua Ti
 ```
 Thong_Ke
 ├── Tong_Quan
-│   ├── Số admin (owner)      — MVP: 1
+│   ├── Quản trị viên (co-owner) X/3  (+ 1 chủ chính)
 │   ├── Số NV active
 │   ├── Số khách active
 │   ├── Doanh thu tháng
@@ -334,4 +336,5 @@ sequenceDiagram
 - [x] Top 10 = số lần giao hoàn thành
 - [x] Mã mời trong Đội ngũ
 - [x] **「TÔI PHÊ DUYỆT」** — triển khai P0+
+- [x] Co-owner — `docs/features/co-owner.md`
 - [x] Backup: tag `backup/pre-bot-menu-v2` @ `62880c6`

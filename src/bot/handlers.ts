@@ -23,6 +23,7 @@ import { handleStatsFlowCallback } from "./stats-flow.js";
 import { adminMenu, backMenu, employeeMenu, mainMenu } from "./keyboards.js";
 import { replyMenuForUser, sendHelp } from "./menu-commands.js";
 import { AppError, forbiddenError } from "../../utils/errors.js";
+import { isAdminRole } from "../../utils/auth-roles.js";
 import {
   CUSTOMER_INPUT_EXAMPLE,
   CUSTOMER_INPUT_FORMAT,
@@ -53,7 +54,7 @@ export function registerBotHandlers(bot: Bot, db: Db) {
   try {
     if (await handleOrderCallback(ctx, db, user, data)) return;
     if (await handleSettingsCallback(ctx, db, user, data)) return;
-    if (user.role === "owner") {
+    if (isAdminRole(user.role)) {
       if (await handleTeamCallback(ctx, db, user, data)) return;
       if (await handleCustomerFlowCallback(ctx, db, user, data)) return;
       if (await handleStatsFlowCallback(ctx, db, user, data)) return;
@@ -139,14 +140,14 @@ async function handleCallback(
   }
 
   if (data === "payment_collect") {
-    requireOwner(user);
+    requireAdmin(user);
     setSession(ctx.from!.id, { step: "payment_search" });
     await ctx.reply("💵 Thu nợ\nNhập tên, SĐT hoặc địa chỉ khách:");
     return;
   }
 
   if (data.startsWith("payment_pick:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const customerId = data.slice("payment_pick:".length);
     clearSession(ctx.from!.id);
     await startPaymentFlow(ctx, db, ctx.from!.id, customerId);
@@ -161,7 +162,7 @@ async function handleCallback(
   }
 
   if (data === "delivery_new") {
-    if (user.role === "owner") {
+    if (isAdminRole(user.role)) {
       await handleOrderCallback(ctx, db, user, "order_new");
     } else {
       await handleOrderCallback(ctx, db, user, "orders_list");
@@ -170,13 +171,13 @@ async function handleCallback(
   }
 
   if (data === "search") {
-    requireOwner(user);
+    requireAdmin(user);
     await showCustomersHub(ctx, db);
     return;
   }
 
   if (data === "customer_add") {
-    requireOwner(user);
+    requireAdmin(user);
     setSession(ctx.from!.id, { step: "customer_add" });
     await ctx.reply(
       `➕ Thêm khách mới\nGửi theo format:\n\`${CUSTOMER_INPUT_FORMAT}\`\n\nVD: \`${CUSTOMER_INPUT_EXAMPLE}\``,
@@ -186,7 +187,7 @@ async function handleCallback(
   }
 
   if (data === "customer_save") {
-    requireOwner(user);
+    requireAdmin(user);
     const session = getSession(ctx.from!.id);
     if (!session.customerDraft) {
       await ctx.reply("⚠️ Phiên hết hạn — bấm ➕ Thêm khách lại", {
@@ -226,14 +227,14 @@ async function handleText(
 
   if (await handleOrderText(ctx, db, user, step, text)) return true;
   if (await handleSettingsText(ctx, db, user, step, text)) return true;
-  if (user.role === "owner") {
+  if (isAdminRole(user.role)) {
     if (await handleTeamText(ctx, db, step, text)) return true;
     if (await handleCustomerFlowText(ctx, db, step, text)) return true;
   }
 
   if (
     (step === "idle" || step === "customer_add" || step === "customer_confirm") &&
-    user.role === "owner" &&
+    isAdminRole(user.role) &&
     looksLikeCustomerAdd(text)
   ) {
     await showCustomerConfirm(ctx, telegramId, text);
@@ -246,25 +247,25 @@ async function handleText(
   }
 
   if (step === "payment_search") {
-    requireOwner(user);
+    requireAdmin(user);
     await processPaymentSearch(ctx, db, telegramId, text);
     return true;
   }
 
   if (step === "payment_input") {
-    requireOwner(user);
+    requireAdmin(user);
     await processPaymentInput(ctx, db, telegramId, text, user);
     return true;
   }
 
   if (step === "search_query") {
-    requireOwner(user);
+    requireAdmin(user);
     await handleCustomerFlowText(ctx, db, "customer_search", text);
     return true;
   }
 
   if (step === "customer_add" || step === "customer_confirm") {
-    requireOwner(user);
+    requireAdmin(user);
     await ctx.reply(
       `❌ Sai format.\nGửi đúng: \`${CUSTOMER_INPUT_FORMAT}\`\nVD: \`${CUSTOMER_INPUT_EXAMPLE}\``,
       { parse_mode: "Markdown", reply_markup: cancelCustomerMenu() },
@@ -279,8 +280,8 @@ async function requireUser(db: Db, telegramUserId: number) {
   return getUserByTelegramId(db, telegramUserId);
 }
 
-function requireOwner(user: BotUser) {
-  if (user.role !== "owner") throw forbiddenError("Chỉ chủ đại lý");
+function requireAdmin(user: BotUser) {
+  if (!isAdminRole(user.role)) throw forbiddenError("Chỉ quản trị viên");
 }
 
 async function replyError(ctx: Context, err: unknown) {
@@ -360,7 +361,7 @@ async function replyCustomerDetail(
 ) {
   const { customer, debtBalance } = await getCustomerDetail(db, customerId);
   const kb = new InlineKeyboard();
-  if (user.role === "owner") {
+  if (isAdminRole(user.role)) {
     kb.text("📦 Tạo đơn", `order_for_customer:${customerId}`).row();
     kb.text("💵 Thu nợ", `payment_pick:${customerId}`).row();
     kb.text("◀️ Khách hàng", "customers");
@@ -385,7 +386,7 @@ async function replyDebtCard(
   user: BotUser,
   customerId: string,
 ) {
-  if (user.role === "owner") {
+  if (isAdminRole(user.role)) {
     await replyCustomerDetail(ctx, db, user, customerId);
     return;
   }

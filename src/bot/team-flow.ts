@@ -1,8 +1,9 @@
 import { InlineKeyboard, type Context } from "grammy";
 import type { Db } from "../db/index.js";
 import type { users } from "../db/schema.js";
-import { createInviteCode, buildInviteDeepLink } from "../services/auth.service.js";
+import { createInviteCode, buildInviteDeepLink, createCoOwnerInvite, countCoOwners } from "../services/auth.service.js";
 import { listTeamMembers, updateEmployee } from "../services/employee.service.js";
+import { isPrimaryOwnerRole, MAX_CO_OWNERS } from "../../utils/auth-roles.js";
 import {
   assignOrderToEmployee,
   findOpenOrderByShortCode,
@@ -18,7 +19,7 @@ function teamMemberButtonLabel(name: string, roleLabel: string) {
   return `${name} — ${roleLabel}`.slice(0, 64);
 }
 
-export async function showTeamList(ctx: Context, db: Db) {
+export async function showTeamList(ctx: Context, db: Db, actor?: { role: string }) {
   const team = await listTeamMembers(db);
   if (!team.length) {
     await ctx.reply("👷 Chưa có nhân sự.", { reply_markup: backMenu() });
@@ -28,6 +29,12 @@ export async function showTeamList(ctx: Context, db: Db) {
   const kb = new InlineKeyboard();
   for (const m of team) {
     kb.text(teamMemberButtonLabel(m.name, m.roleLabel), `team_member:${m.id}`).row();
+  }
+  if (actor && isPrimaryOwnerRole(actor.role)) {
+    const coCount = await countCoOwners(db);
+    if (coCount < MAX_CO_OWNERS) {
+      kb.text("👑 Mời quản trị viên", "team_invite_co").row();
+    }
   }
   kb.text("🔗 Tạo mã mời NV", "team_invite").row();
   kb.text("◀️ Menu", "menu");
@@ -49,11 +56,11 @@ async function showTeamMemberDetail(ctx: Context, db: Db, employeeId: string) {
       : "Đã kích hoạt Telegram"
     : "Chưa kích hoạt";
 
-  const kb = new InlineKeyboard()
-    .text("✏️ Cập nhật", `team_update:${m.id}`)
-    .text("📋 Giao việc", `team_assign:${m.id}`)
-    .row()
-    .text("◀️ Đội ngũ", "team_menu");
+  const kb = new InlineKeyboard().text("✏️ Cập nhật", `team_update:${m.id}`);
+  if (m.role === "employee") {
+    kb.text("📋 Giao việc", `team_assign:${m.id}`);
+  }
+  kb.row().text("◀️ Đội ngũ", "team_menu");
 
   await ctx.reply(
     [
@@ -75,7 +82,7 @@ export async function handleTeamCallback(
   data: string,
 ): Promise<boolean> {
   if (data === "team_menu") {
-    await showTeamList(ctx, db);
+    await showTeamList(ctx, db, user);
     return true;
   }
 
@@ -130,6 +137,31 @@ export async function handleTeamCallback(
       ].join("\n"),
       { reply_markup: new InlineKeyboard().text("❌ Huỷ", `team_member:${employeeId}`) },
     );
+    return true;
+  }
+
+  if (data === "team_invite_co") {
+    try {
+      const invite = await createCoOwnerInvite(db, user);
+      const link = buildInviteDeepLink(invite.code);
+      await ctx.reply(
+        [
+          "👑 Mời quản trị viên (co-owner)",
+          "",
+          `Mã: ${invite.code}`,
+          `Link: ${link}`,
+          "",
+          `Tối đa ${MAX_CO_OWNERS} quản trị viên. Hết hạn sau 72 giờ.`,
+          "Gửi link cho người tin cậy → bấm Start trong Telegram.",
+        ].join("\n"),
+        { reply_markup: new InlineKeyboard().text("◀️ Đội ngũ", "team_menu") },
+      );
+    } catch (err) {
+      const msg = err instanceof AppError ? err.message : "Không tạo được mã mời";
+      await ctx.reply(`❌ ${msg}`, {
+        reply_markup: new InlineKeyboard().text("◀️ Đội ngũ", "team_menu"),
+      });
+    }
     return true;
   }
 

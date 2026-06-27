@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 
 import { getWebhookUrl } from "../config/env.js";
 import { handleStartCommand } from "./activation.js";
+import { isAdminRole } from "../../utils/auth-roles.js";
 import { registerBotHandlers } from "./handlers.js";
 import {
   buildHelpText,
@@ -39,8 +40,8 @@ export async function registerBot(app: FastifyInstance) {
       await ctx.reply(NOT_ACTIVATED);
       return;
     }
-    if (user.role !== "owner") {
-      await ctx.reply("❌ Chỉ chủ đại lý.\nNhân viên gõ: /nhan_vien");
+    if (!isAdminRole(user.role)) {
+      await ctx.reply("❌ Chỉ quản trị viên.\nNhân viên gõ: /nhan_vien");
       return;
     }
     await replyAdminMenu(ctx);
@@ -52,8 +53,8 @@ export async function registerBot(app: FastifyInstance) {
       await ctx.reply(NOT_ACTIVATED);
       return;
     }
-    if (user.role !== "employee") {
-      await ctx.reply("❌ Chỉ nhân viên.\nChủ đại lý gõ: /menu_admin");
+    if (!isAdminRole(user.role)) {
+      await ctx.reply("❌ Chỉ quản trị viên.\nChủ/co-owner gõ: /menu_admin");
       return;
     }
     await replyEmployeeMenu(ctx);
@@ -74,8 +75,8 @@ export async function registerBot(app: FastifyInstance) {
       await ctx.reply(NOT_ACTIVATED);
       return;
     }
-    if (user.role !== "owner") {
-      await ctx.reply("❌ Chỉ chủ đại lý mới mở được Dashboard web.");
+    if (!isAdminRole(user.role)) {
+      await ctx.reply("❌ Chỉ quản trị viên mới mở được Dashboard web.");
       return;
     }
     await sendWebLogin(ctx, app.db, user);
@@ -87,8 +88,8 @@ export async function registerBot(app: FastifyInstance) {
       await ctx.reply(NOT_ACTIVATED);
       return;
     }
-    if (user.role !== "owner") {
-      await ctx.reply("❌ Chỉ chủ đại lý mới mở được Dashboard web.");
+    if (!isAdminRole(user.role)) {
+      await ctx.reply("❌ Chỉ quản trị viên mới mở được Dashboard web.");
       return;
     }
     await sendWebLogin(ctx, app.db, user);

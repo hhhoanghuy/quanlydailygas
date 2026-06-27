@@ -33,6 +33,7 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 
 function roleBadge(role) {
   if (role === "owner") return '<span class="badge badge-owner">Chủ đại lý</span>';
+  if (role === "co_owner") return '<span class="badge badge-co-owner">Quản trị viên</span>';
   if (role === "employee") return '<span class="badge badge-employee">Nhân viên</span>';
   return '<span class="badge badge-pending">Chưa kích hoạt</span>';
 }
@@ -713,9 +714,10 @@ const pages = {
     };
 
     const load = async () => {
-      const { team, owner } = await api("/employees");
+      const { team, owner, co_owners: coOwners = [] } = await api("/employees");
       const members = team || [];
-      teamCache = owner ? [owner, ...members.filter((m) => !m.isOwner)] : members;
+      const nvMembers = members.filter((m) => m.role === "employee" || m.role === "pending");
+      teamCache = owner ? [owner, ...coOwners, ...nvMembers] : [...coOwners, ...nvMembers];
 
       const ownerRow = owner
         ? `<tr class="row-owner">
@@ -728,8 +730,20 @@ const pages = {
       </tr>`
         : "";
 
-      const nvRows = members
-        .filter((m) => !m.isOwner)
+      const coRows = coOwners
+        .map(
+          (c) => `<tr class="row-co-owner">
+        <td>${roleBadge("co_owner")}</td>
+        <td><strong>${c.name}</strong></td><td>${c.phone}</td>
+        <td>${c.telegramUsername ? "@" + c.telegramUsername : '<span class="badge badge-ok">Telegram OK</span>'}</td>
+        <td>${c.deliveriesThisMonth}</td>
+        <td><span class="badge badge-ok">Hoạt động</span></td>
+        <td><button class="btn btn-sm" data-edit="${c.id}">Sửa</button></td>
+      </tr>`,
+        )
+        .join("");
+
+      const nvRows = nvMembers
         .map((e) => {
           const tg = e.hasTelegram
             ? e.telegramUsername
@@ -748,10 +762,11 @@ const pages = {
       </tr>`;
         });
 
-      const nvOnly = members.filter((m) => !m.isOwner);
+      const nvOnly = nvMembers;
       el.querySelector("#em-body").innerHTML = `
         <div class="stat-grid" style="margin-bottom:1.25rem">
           ${statCard("blue", "users", "Chủ đại lý", owner ? 1 : 0)}
+          ${statCard("purple", "shield", "Quản trị viên", coOwners.length)}
           ${statCard("green", "users", "NV đã kích hoạt", nvOnly.filter((e) => e.role === "employee").length)}
           ${statCard("amber", "users", "NV chờ kích hoạt", nvOnly.filter((e) => e.role === "pending").length)}
         </div>
@@ -760,7 +775,9 @@ const pages = {
           "",
           table(
             ["Vai trò", "Tên", "SĐT", "Telegram", "Đơn/tháng", "Trạng thái", "Thao tác"],
-            ownerRow ? [ownerRow, ...nvRows] : nvRows,
+            ownerRow || coRows.length
+              ? [ownerRow, coRows, ...nvRows].filter(Boolean)
+              : nvRows,
           ),
         )}
         <p class="muted" style="margin-top:.75rem;font-size:.8rem">
@@ -933,9 +950,13 @@ function renderApp(user) {
   document.getElementById("app-screen").classList.remove("hidden");
   document.getElementById("user-name").textContent = user.name;
   const roleEl = document.getElementById("user-role");
-  const isOwner = user.role === "owner";
-  roleEl.textContent = isOwner ? "Chủ đại lý" : "Nhân viên";
-  roleEl.className = "user-role " + (isOwner ? "role-owner" : "role-employee");
+  const isAdmin = user.role === "owner" || user.role === "co_owner";
+  const roleLabel =
+    user.role === "owner" ? "Chủ đại lý" : user.role === "co_owner" ? "Quản trị viên" : "Nhân viên";
+  roleEl.textContent = roleLabel;
+  roleEl.className =
+    "user-role " +
+    (user.role === "owner" ? "role-owner" : user.role === "co_owner" ? "role-co-owner" : "role-employee");
   const initial = (AGENCY || "G").charAt(0).toUpperCase();
   document.getElementById("brand-initial").textContent = initial;
   const loginLogo = document.querySelector(".login-logo");

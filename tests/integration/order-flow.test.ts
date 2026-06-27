@@ -124,7 +124,7 @@ describe.skipIf(!hasDb)("order flow (integration)", () => {
     ownerUserId = owner.id;
 
     const ownerEmployeeId = await ensureEmployeeId(db, owner);
-    const workers = await listDeliveryWorkers(db, owner, ownerEmployeeId);
+    const workers = await listDeliveryWorkers(db);
     expect(workers).toHaveLength(1);
     expect(workers[0].isOwner).toBe(true);
 

@@ -9,6 +9,7 @@ import {
 import { createInviteCode, buildInviteDeepLink } from "../services/auth.service.js";
 import { clearSession, getSession, setSession } from "./session.js";
 import { forbiddenError } from "../../utils/errors.js";
+import { isAdminRole } from "../../utils/auth-roles.js";
 import { backMenu } from "./keyboards.js";
 
 type BotUser = typeof users.$inferSelect;
@@ -29,8 +30,8 @@ function priceTableMenu() {
     .text("📋 Menu", "menu");
 }
 
-function requireOwner(user: BotUser) {
-  if (user.role !== "owner") throw forbiddenError("Chỉ chủ đại lý");
+function requireAdmin(user: BotUser) {
+  if (!isAdminRole(user.role)) throw forbiddenError("Chỉ quản trị viên");
 }
 
 export async function handleSettingsCallback(
@@ -40,41 +41,41 @@ export async function handleSettingsCallback(
   data: string,
 ): Promise<boolean> {
   if (data === "settings") {
-    requireOwner(user);
+    requireAdmin(user);
     clearSession(ctx.from!.id);
     await ctx.reply("⚙️ Cài đặt", { reply_markup: settingsMenu() });
     return true;
   }
 
   if (data === "settings_prices") {
-    requireOwner(user);
+    requireAdmin(user);
     clearSession(ctx.from!.id);
     await showPriceTable(ctx, db);
     return true;
   }
 
   if (data === "settings_prices_edit") {
-    requireOwner(user);
+    requireAdmin(user);
     await showPriceTypePicker(ctx, db);
     return true;
   }
 
   if (data.startsWith("settings_price_type:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const typeId = data.slice("settings_price_type:".length);
     await pickPriceType(ctx, db, typeId);
     return true;
   }
 
   if (data === "settings_prices_cancel") {
-    requireOwner(user);
+    requireAdmin(user);
     clearSession(ctx.from!.id);
     await showPriceTable(ctx, db);
     return true;
   }
 
   if (data === "settings_invite") {
-    requireOwner(user);
+    requireAdmin(user);
     const invite = await createInviteCode(db, "employee", 72);
     const link = buildInviteDeepLink(invite.code);
     await ctx.reply(
@@ -95,7 +96,7 @@ export async function handleSettingsText(
   text: string,
 ): Promise<boolean> {
   if (step === "settings_price_amount") {
-    requireOwner(user);
+    requireAdmin(user);
     await saveSinglePrice(ctx, db, text);
     return true;
   }

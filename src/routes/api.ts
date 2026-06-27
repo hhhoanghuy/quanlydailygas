@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { authMiddleware } from "../middleware/auth.js";
 import {
   activateInvite,
-  assertOwner,
+  assertAdmin,
   buildInviteDeepLink,
   createInviteCode,
   exchangeMagicLink,
@@ -113,7 +113,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.post("/price-periods", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const body = req.body as {
           name: string;
           effective_from: string;
@@ -130,7 +130,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.get("/customers", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { search?: string; limit?: string; offset?: string };
         return {
           data: await listCustomers(api.db, {
@@ -142,7 +142,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.post("/customers", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const body = req.body as Record<string, string>;
         return createCustomer(api.db, {
           name: body.name,
@@ -154,7 +154,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
         });
 
         secured.put("/customers/:id", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         const body = req.body as Record<string, string>;
         return updateCustomer(api.db, id, {
@@ -167,19 +167,19 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.patch("/customers/:id/deactivate", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return deactivateCustomer(api.db, id);
       });
 
         secured.delete("/customers/:id", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return hardDeleteCustomer(api.db, id);
       });
 
         secured.get("/customers/:id", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return getCustomerDetail(api.db, id, ENABLE_CYLINDER_LEDGER);
       });
@@ -190,7 +190,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
         });
 
         secured.get("/deliveries", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { from?: string; to?: string };
         return {
           data: await listDeliveries(api.db, {
@@ -211,13 +211,13 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.post("/deliveries/:id/void", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return voidDelivery(api.db, id);
         });
 
         secured.get("/payments", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { from?: string; to?: string; customer_id?: string };
         return {
           data: await listPayments(api.db, {
@@ -229,7 +229,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.post("/payments", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const body = req.body as {
           customer_id: string;
           amount: number;
@@ -247,24 +247,25 @@ export async function registerApiRoutes(app: FastifyInstance) {
         });
 
         secured.get("/employees", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const team = await listTeamMembers(api.db);
         return {
-          data: team.filter((m) => !m.isOwner),
+          data: team.filter((m) => m.role === "employee" || m.role === "pending"),
           team,
           owner: team.find((m) => m.isOwner) ?? null,
+          co_owners: team.filter((m) => m.isCoOwner),
         };
       });
 
         secured.patch("/employees/:id/active", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         const body = req.body as { active: boolean };
         return setEmployeeActive(api.db, id, body.active);
       });
 
         secured.patch("/employees/:id", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         const body = req.body as { name?: string; phone?: string };
         const row = await updateEmployee(api.db, id, body);
@@ -272,23 +273,23 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.get("/cylinders/holders", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { search?: string };
         return { data: await listCylinderHolders(api.db, { search: q.search }) };
       });
 
         secured.get("/cylinders/summary", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         return { data: await getCylinderSummaryByType(api.db) };
       });
 
         secured.get("/orders/stats", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         return getStatsOrders(api.db);
       });
 
         secured.get("/orders", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { status?: string; limit?: string; offset?: string };
         return {
           data: await listOrders(api.db, {
@@ -300,13 +301,13 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.get("/orders/:id", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return getOrderDetailForWeb(api.db, id);
       });
 
         secured.post("/orders/:id/preview-correction", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return previewOrderCorrection(api.db, id, mapCorrectionBody(req.body as CorrectionBody), {
           allowGasSurplus: ENABLE_GAS_SURPLUS,
@@ -314,7 +315,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.post("/orders/:id/correct", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const { id } = req.params as { id: string };
         return correctCompletedOrder(api.db, id, mapCorrectionBody(req.body as CorrectionBody), {
           allowGasSurplus: ENABLE_GAS_SURPLUS,
@@ -323,19 +324,19 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.get("/gas-surplus", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         return getGasSurplusDashboard(api.db);
       });
 
         secured.get("/dashboard/trend", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { days?: string };
         const days = Math.min(30, Math.max(3, Number(q.days) || 7));
         return getDashboardTrend(api.db, days);
       });
 
         secured.get("/dashboard", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const q = req.query as { date?: string; period?: "day" | "month" };
         const date = q.date ? new Date(q.date) : new Date();
         const period = q.period === "month" ? "month" : "day";
@@ -346,17 +347,17 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.get("/dashboard/debtors", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         return { data: await listDebtors(api.db) };
       });
 
         secured.get("/dashboard/zero-debt-customers", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         return { data: await listZeroDebtCustomers(api.db) };
       });
 
         secured.post("/invite-codes", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         const body = req.body as { role?: "employee"; expires_in_hours?: number };
         const code = await createInviteCode(
           api.db,
@@ -372,7 +373,7 @@ export async function registerApiRoutes(app: FastifyInstance) {
       });
 
         secured.post("/admin/backfill-cylinder-ledger", async (req) => {
-        assertOwner(req.user!);
+        assertAdmin(req.user!);
         if (!ENABLE_CYLINDER_LEDGER) {
           throw forbiddenError("Cylinder ledger chưa bật");
         }

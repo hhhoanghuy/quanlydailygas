@@ -28,6 +28,7 @@ import {
   formatCustomerPickList,
 } from "../../utils/customer-display.js";
 import { AppError, forbiddenError } from "../../utils/errors.js";
+import { isAdminRole } from "../../utils/auth-roles.js";
 import { mainMenu } from "./keyboards.js";
 
 type BotUser = typeof users.$inferSelect;
@@ -41,7 +42,7 @@ export async function handleOrderCallback(
   data: string,
 ): Promise<boolean> {
   if (data.startsWith("order_for_customer:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const customerId = data.slice("order_for_customer:".length);
     const { customer } = await getCustomerDetail(db, customerId);
     setSession(ctx.from!.id, {
@@ -58,7 +59,7 @@ export async function handleOrderCallback(
   }
 
   if (data === "order_new") {
-    requireOwner(user);
+    requireAdmin(user);
     setSession(ctx.from!.id, { step: "order_customer_phone" });
     await ctx.reply("📞 Lên đơn mới\nNhập SĐT, tên hoặc địa chỉ khách:");
     return true;
@@ -76,20 +77,20 @@ export async function handleOrderCallback(
   }
 
   if (data === "order_confirm_save") {
-    requireOwner(user);
+    requireAdmin(user);
     await promptEmployeeOrSaveOrder(ctx, db, user);
     return true;
   }
 
   if (data.startsWith("order_assign_emp:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const employeeId = data.slice("order_assign_emp:".length);
     await finalizeOwnerOrder(ctx, db, user, employeeId);
     return true;
   }
 
   if (data.startsWith("order_pick_cust:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const customerId = data.slice("order_pick_cust:".length);
     const { customer } = await getCustomerDetail(db, customerId);
     setSession(ctx.from!.id, {
@@ -106,7 +107,7 @@ export async function handleOrderCallback(
   }
 
   if (data.startsWith("pick_order_cyl:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const typeId = data.slice("pick_order_cyl:".length);
     const session = getSession(ctx.from!.id);
     if (!session.orderDraft) {
@@ -127,7 +128,7 @@ export async function handleOrderCallback(
   }
 
   if (data === "order_add_more") {
-    requireOwner(user);
+    requireAdmin(user);
     const session = getSession(ctx.from!.id);
     if (!session.orderDraft) return true;
     await showOrderCylinderPicker(ctx, db, session.orderDraft.customerName);
@@ -158,7 +159,7 @@ export async function handleOrderCallback(
   }
 
   if (data.startsWith("order_cancel:")) {
-    requireOwner(user);
+    requireAdmin(user);
     const orderId = data.slice("order_cancel:".length);
     await cancelDeliveryOrder(db, orderId);
     await ctx.reply("❌ Đã huỷ đơn", { reply_markup: mainMenu(user.role) });
@@ -176,13 +177,13 @@ export async function handleOrderText(
   text: string,
 ): Promise<boolean> {
   if (step === "order_customer_phone") {
-    requireOwner(user);
+    requireAdmin(user);
     await pickCustomerForOrder(ctx, db, text);
     return true;
   }
 
   if (step === "order_line_qty") {
-    requireOwner(user);
+    requireAdmin(user);
     await addOrderLineQty(ctx, text);
     return true;
   }
@@ -195,8 +196,8 @@ export async function handleOrderText(
   return false;
 }
 
-function requireOwner(user: BotUser) {
-  if (user.role !== "owner") throw forbiddenError("Chỉ chủ đại lý");
+function requireAdmin(user: BotUser) {
+  if (!isAdminRole(user.role)) throw forbiddenError("Chỉ quản trị viên");
 }
 
 async function pickCustomerForOrder(ctx: Context, db: Db, query: string) {
@@ -304,8 +305,7 @@ async function promptEmployeeOrSaveOrder(ctx: Context, db: Db, user: BotUser) {
     return;
   }
 
-  const ownerEmployeeId = await ensureEmployeeId(db, user);
-  const workers = await listDeliveryWorkers(db, user, ownerEmployeeId);
+  const workers = await listDeliveryWorkers(db);
 
   if (workers.length === 1) {
     await finalizeOwnerOrder(ctx, db, user, workers[0].employeeId);
@@ -352,10 +352,9 @@ async function finalizeOwnerOrder(
     clearSession(ctx.from!.id);
 
     const summary = draft.lines.map((l) => `${l.cylinderName} ×${l.cylindersOut}`).join(", ");
-    const ownerEmployeeId = await ensureEmployeeId(db, user);
     const assignee =
       assignedEmployeeId &&
-      (await listDeliveryWorkers(db, user, ownerEmployeeId)).find(
+      (await listDeliveryWorkers(db)).find(
         (w) => w.employeeId === assignedEmployeeId,
       )?.name;
 
@@ -395,7 +394,7 @@ async function showOrdersList(ctx: Context, db: Db, user: BotUser) {
         `🛢 ${o.lineSummary}`,
         `📌 ${orderStatusText(o.status)}`,
       ];
-      if (user.role === "owner") {
+      if (isAdminRole(user.role)) {
         lines.push(`👷 ${o.assignedEmployeeName ?? "chưa gán người giao"}`);
       }
       return lines.join("\n");
@@ -408,7 +407,7 @@ async function showOrdersList(ctx: Context, db: Db, user: BotUser) {
     kb.text(label, `order_open:${o.id}`).row();
   }
   kb.text("◀️ Menu", "menu");
-  const listTitle = user.role === "owner" ? "Đơn mở" : "Đơn cần giao";
+  const listTitle = isAdminRole(user.role) ? "Đơn mở" : "Đơn cần giao";
   await ctx.reply(`📋 ${listTitle} (${orders.length})\n\n${summaryText}`, { reply_markup: kb });
 }
 
@@ -424,7 +423,8 @@ async function showOrderDetail(
     .join("\n");
 
   const kb = new InlineKeyboard();
-  const assigneeId = user.employeeId ?? (user.role === "owner" ? await ensureEmployeeId(db, user) : null);
+  const assigneeId =
+    user.employeeId ?? (isAdminRole(user.role) ? await ensureEmployeeId(db, user) : null);
   const canFulfill =
     Boolean(assigneeId) &&
     (order.status === "pending" || order.status === "delivering") &&
@@ -433,7 +433,7 @@ async function showOrderDetail(
   if (canFulfill) {
     kb.text("🚚 Giao hàng", `order_fulfill:${order.id}`).row();
   }
-  if (user.role === "owner" && (order.status === "pending" || order.status === "delivering")) {
+  if (isAdminRole(user.role) && (order.status === "pending" || order.status === "delivering")) {
     kb.text("❌ Huỷ đơn", `order_cancel:${order.id}`).row();
   }
   kb.text("◀️ Danh sách", "orders_list").text("📋 Menu", "menu");
